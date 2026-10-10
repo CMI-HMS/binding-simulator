@@ -1223,7 +1223,7 @@ var SCENARIOS = [
       state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10, n:1, min:0.1221,  max:1000, reps:3, kon:1e6, koff:1e-2, kcalc:'off' };
       state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:100,n:1, min:1.221,   max:10000,reps:3, kon:1e6, koff:1e-1, kcalc:'off' };
     } },
-  { key:'antibody', title:'High affinity surface-bound kinetics',
+  { key:'antibody', title:'Kinetics - high affinity',
     blurb:'Kd 0.1 nM, koff 5e-5 /s on a sensor surface',
     sets:{ rates:true },
     apply:function(){
@@ -1237,6 +1237,21 @@ var SCENARIOS = [
       state.ligands[0] = { name:'Ligand A', on:true,  pt:0.05, kd:0.1, n:1, min:0.15625, max:10, dil:2, reps:3, kon:5e5, koff:5e-5, kcalc:'on' };
       state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10,  n:1, min:0.1221,  max:1000, reps:3, kon:1e6, koff:1e-2, kcalc:'off' };
       state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:100, n:1, min:1.221,   max:10000,reps:3, kon:1e6, koff:1e-1, kcalc:'off' };
+    } },
+  { key:'samekd', title:'Kinetics - same Kd, different rates',
+    blurb:'Kd 10 nM from fast or slow rates, on a surface',
+    sets:{ rates:true },
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.02;
+      // the same Kd = koff/kon reached two ways: 1e6 and 1e-2, or 5e4 and 5e-4.
+      // 7 three-fold steps down from 100 nM, 10 min on and 20 min off: the
+      // equilibrium curves match, the sensorgrams do not
+      state.points = 7;
+      state.kin = true; state.surf = true; state.ta = 600; state.td = 1200; state.tab = 'kin';
+      state.ligands[0] = { name:'Fast on/off', on:true,  pt:0.05, kd:10, n:1, min:0.13717, max:100, dil:3, reps:3, kon:1e6, koff:1e-2, kcalc:'off' };
+      state.ligands[1] = { name:'Slow on/off', on:true,  pt:0.05, kd:10, n:1, min:0.13717, max:100, dil:3, reps:3, kon:5e4, koff:5e-4, kcalc:'off' };
+      state.ligands[2] = { name:'Ligand C',    on:false, pt:0.05, kd:10, n:1, min:0.13717, max:100, dil:3, reps:3, kon:1e5, koff:1e-3, kcalc:'off' };
     } },
   { key:'hill', title:'Cooperativity',
     blurb:'3 curves with variable hill slopes',
