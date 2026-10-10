@@ -2487,9 +2487,8 @@ function renderDesignNotes(){
   };
   var kd = surfOn() ? kinData() : [];
   var kn = kd.length ? kinNotes(kd) : [];
-  host.innerHTML = surfOn()
-    ? block('Equilibrium fit (steady state)', eq) + (kn.length ? block('Kinetic fit (rate constants)', kn) : '')
-    : block('Equilibrium', eq);
+  host.innerHTML = block('Equilibrium fit (steady state)', eq) +
+    (surfOn() && kn.length ? block('Kinetic fit (rate constants)', kn) : '');
   // the closed accordion still says whether anything needs attention
   var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Association is too short)/;
   var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
