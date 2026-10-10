@@ -447,6 +447,11 @@ details.note > summary::-webkit-details-marker{display:none}
 details.note > summary::before{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--muted);
   border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin-right:2px}
 details.note[open] > summary::before{transform:rotate(45deg)}
+/* an accordion nested inside another: a divider and a smaller heading, no card */
+details.note.sub{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;margin:0 16px;box-shadow:none}
+details.note.sub > summary{padding:10px 0;border-radius:0}
+details.note.sub > summary h3{font-size:13.5px}
+details.note.sub .nbody{padding:4px 0 16px}
 details.note > summary:hover h3{color:var(--ink-2)}
 details.note > summary:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
 details.note .nbody{padding:4px 16px 16px}
@@ -1085,39 +1090,39 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
       <p class="eq"><span class="cm">dissociation</span>f(t) = f(t<sub>a</sub>)·e<sup>−k<sub>off</sub>(t − t<sub>a</sub>)</sup></p>
       </section>
       </div>
+      <details class="note sub" id="rateCard">
+        <summary><h3>Rate equations with depletion</h3></summary>
+        <div class="nbody mcols">
+        <section>
+        <h4 class="msub">1 · The rate equation</h4>
+        <p>Let x = [PL]. Every complex formed uses up one protein and one ligand, so the free concentrations fall as x rises.</p>
+        <p class="eq"><span class="cm">free partners</span>[P] = P<sub>T</sub> − x, &nbsp;[L] = L<sub>T</sub> − x</p>
+        <p class="eq"><span class="cm">rate</span>dx/dt = k<sub>on</sub>(P<sub>T</sub> − x)(L<sub>T</sub> − x) − k<sub>off</sub>x</p>
+        <p>Factor out k<sub>on</sub> and use K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>:</p>
+        <p class="eq"><span class="cm">rearranged</span>dx/dt = k<sub>on</sub>[ x² − (P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>)x + P<sub>T</sub>L<sub>T</sub> ]</p>
+        <h4 class="msub">2 · The quadratic and its two roots</h4>
+        <p>The bracket is a quadratic in x, so it factors as (x − C<sub>1</sub>)(x − C<sub>2</sub>). With b = P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>:</p>
+        <p class="eq"><span class="cm">smaller root</span>C<sub>1</sub> = ( b − <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
+        <p class="eq"><span class="cm">larger root</span>C<sub>2</sub> = ( b + <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
+        <p><b>C<sub>1</sub> is the equilibrium complex.</b> It is where dx/dt = 0, the same [PL] the quadratic 1:1 model gives. <b>C<sub>2</sub> is a mathematical root only.</b> It is larger than P<sub>T</sub> or L<sub>T</sub>, so the system never gets there, but it still shapes the curve. Two identities are useful: C<sub>1</sub>C<sub>2</sub> = P<sub>T</sub>L<sub>T</sub>, and C<sub>2</sub> − C<sub>1</sub> = <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span>.</p>
+        </section>
+        <section>
+        <h4 class="msub">3 · Solving it</h4>
+        <p>dx/dt = k<sub>on</sub>(x − C<sub>1</sub>)(x − C<sub>2</sub>) separates and integrates exactly. Starting from x = 0 at t = 0:</p>
+        <p class="eq"><span class="cm">association</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
+        <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub>(C<sub>2</sub> − C<sub>1</sub>) = k<sub>on</sub><span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
+        <h4 class="msub">4 · Sanity checks</h4>
+        <p><b>At t = 0</b>, e<sup>0</sup> = 1, so the numerator is 0 and [PL] = 0.</p>
+        <p><b>As t → ∞</b>, the exponential goes to 0, so [PL] → C<sub>1</sub>C<sub>2</sub>/C<sub>2</sub> = C<sub>1</sub>, the equilibrium complex.</p>
+        <p><b>With dilute protein</b> (P<sub>T</sub> ≪ L<sub>T</sub> + K<sub>d</sub>), C<sub>1</sub> is tiny next to C<sub>2</sub> ≈ L<sub>T</sub> + K<sub>d</sub>, so the C<sub>1</sub> term in the denominator drops out and the familiar single exponential remains:</p>
+        <p class="eq"><span class="cm">dilute limit</span>[PL](t) ≈ C<sub>1</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>), &nbsp;k<sub>obs</sub> ≈ k<sub>on</sub>[L] + k<sub>off</sub></p>
+        <h4 class="msub">Why depletion bends the curve</h4>
+        <p>When protein is comparable to K<sub>d</sub> or to the ligand, the C<sub>1</sub> term in the denominator matters. As complex forms, free ligand runs down, so binding slows more than a single exponential predicts and k<sub>obs</sub> is no longer k<sub>on</sub>[L] + k<sub>off</sub>. The simulator computes C<sub>2</sub> from the square root and then C<sub>1</sub> = P<sub>T</sub>L<sub>T</sub>/C<sub>2</sub>, which avoids rounding error when C<sub>1</sub> is very small.</p>
+        </section>
+        </div>
+      </details>
     </details>
 
-    <details class="note" id="rateCard">
-      <summary><h3>Rate equations with depletion</h3></summary>
-      <div class="nbody mcols">
-      <section>
-      <h4 class="msub">1 · The rate equation</h4>
-      <p>Let x = [PL]. Every complex formed uses up one protein and one ligand, so the free concentrations fall as x rises.</p>
-      <p class="eq"><span class="cm">free partners</span>[P] = P<sub>T</sub> − x, &nbsp;[L] = L<sub>T</sub> − x</p>
-      <p class="eq"><span class="cm">rate</span>dx/dt = k<sub>on</sub>(P<sub>T</sub> − x)(L<sub>T</sub> − x) − k<sub>off</sub>x</p>
-      <p>Factor out k<sub>on</sub> and use K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>:</p>
-      <p class="eq"><span class="cm">rearranged</span>dx/dt = k<sub>on</sub>[ x² − (P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>)x + P<sub>T</sub>L<sub>T</sub> ]</p>
-      <h4 class="msub">2 · The quadratic and its two roots</h4>
-      <p>The bracket is a quadratic in x, so it factors as (x − C<sub>1</sub>)(x − C<sub>2</sub>). With b = P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>:</p>
-      <p class="eq"><span class="cm">smaller root</span>C<sub>1</sub> = ( b − <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
-      <p class="eq"><span class="cm">larger root</span>C<sub>2</sub> = ( b + <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
-      <p><b>C<sub>1</sub> is the equilibrium complex.</b> It is where dx/dt = 0, the same [PL] the quadratic 1:1 model gives. <b>C<sub>2</sub> is a mathematical root only.</b> It is larger than P<sub>T</sub> or L<sub>T</sub>, so the system never gets there, but it still shapes the curve. Two identities are useful: C<sub>1</sub>C<sub>2</sub> = P<sub>T</sub>L<sub>T</sub>, and C<sub>2</sub> − C<sub>1</sub> = <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span>.</p>
-      </section>
-      <section>
-      <h4 class="msub">3 · Solving it</h4>
-      <p>dx/dt = k<sub>on</sub>(x − C<sub>1</sub>)(x − C<sub>2</sub>) separates and integrates exactly. Starting from x = 0 at t = 0:</p>
-      <p class="eq"><span class="cm">association</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
-      <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub>(C<sub>2</sub> − C<sub>1</sub>) = k<sub>on</sub><span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
-      <h4 class="msub">4 · Sanity checks</h4>
-      <p><b>At t = 0</b>, e<sup>0</sup> = 1, so the numerator is 0 and [PL] = 0.</p>
-      <p><b>As t → ∞</b>, the exponential goes to 0, so [PL] → C<sub>1</sub>C<sub>2</sub>/C<sub>2</sub> = C<sub>1</sub>, the equilibrium complex.</p>
-      <p><b>With dilute protein</b> (P<sub>T</sub> ≪ L<sub>T</sub> + K<sub>d</sub>), C<sub>1</sub> is tiny next to C<sub>2</sub> ≈ L<sub>T</sub> + K<sub>d</sub>, so the C<sub>1</sub> term in the denominator drops out and the familiar single exponential remains:</p>
-      <p class="eq"><span class="cm">dilute limit</span>[PL](t) ≈ C<sub>1</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>), &nbsp;k<sub>obs</sub> ≈ k<sub>on</sub>[L] + k<sub>off</sub></p>
-      <h4 class="msub">Why depletion bends the curve</h4>
-      <p>When protein is comparable to K<sub>d</sub> or to the ligand, the C<sub>1</sub> term in the denominator matters. As complex forms, free ligand runs down, so binding slows more than a single exponential predicts and k<sub>obs</sub> is no longer k<sub>on</sub>[L] + k<sub>off</sub>. The simulator computes C<sub>2</sub> from the square root and then C<sub>1</sub> = P<sub>T</sub>L<sub>T</sub>/C<sub>2</sub>, which avoids rounding error when C<sub>1</sub> is very small.</p>
-      </section>
-      </div>
-    </details>
 
   </div>
   </div><!-- /accs -->
@@ -3436,7 +3441,7 @@ document.addEventListener('click', function(ev){
   ev.preventDefault();
   var acc = document.getElementById((a.getAttribute('href') || '#kinAcc').slice(1));
   if (!acc || acc.hidden) return;
-  acc.open = true;
+  for (var d = acc; d; d = d.parentElement && d.parentElement.closest('details')) d.open = true;
   acc.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
