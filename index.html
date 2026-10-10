@@ -70,7 +70,8 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;
 /* the three ligand cards share whatever height the panel is stretched to,
    their rows spread evenly inside them */
 .params #ligands{flex:1 1 auto;gap:6px}
-.params .lig{flex:1 1 0;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:5px 6px 6px}
+/* every card keeps its own height, on or off, so toggles never move them */
+.params .lig{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:5px 6px 6px}
 .params .lig > .lig-head{margin-bottom:0}
 .params .lig > .kgrid{margin-top:0}
 /* switched off while measuring the panel's natural height */
@@ -464,6 +465,8 @@ details.note .nbody{padding:4px 16px 16px}
 footer{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);
   font-size:12px;color:var(--muted)}
 footer p{margin:0}
+footer{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px}
+footer .madewith{margin-left:auto;color:var(--muted);font-size:11.5px}
 .credit{margin-top:10px;color:var(--ink-2);font-size:12.5px}
 .credit b{color:var(--ink);font-weight:600}
 footer a{color:inherit;text-decoration:underline;text-underline-offset:2px;
@@ -479,7 +482,21 @@ footer a:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-ra
 .kt input{width:86px}
 /* hidden, not removed, so switching kinetics on does not push the panel down */
 .kinrow.off .kt{visibility:hidden}
-#coopRow{border-top:0!important;padding-top:0!important;margin-top:6px!important}
+#kinRow{border-top:0!important;padding-top:0!important;margin-top:6px!important}
+.kmode{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+.ktimes{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin:5px 0 0 40px}
+/* hidden but still taking its space, so kinetics on/off moves nothing */
+.ktimes.off{visibility:hidden}
+.ktimes > div{min-width:0}
+.ktimes label{font-size:10.5px;color:var(--ink-2);margin:0 0 1px;white-space:nowrap;display:flex;align-items:center;gap:4px;height:15px}
+.ktimes .ktchk{cursor:pointer}
+.ktimes .ktchk input{width:12px;height:12px;margin:0;accent-color:var(--on);cursor:pointer}
+.ktimes input[type=number]{width:100%;box-sizing:border-box}
+.ktimes input[type=number]:disabled{opacity:.45}
+
+/* the surface format is an option of Add Kinetics: indented under it, greyed while kinetics is off */
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lig .pt-off input{opacity:.45}
 /* the Hill slope switch exists only while cooperativity is on */
 .stage:not(.coop) .modpanel .mslot .rowpair{display:none}
 .calcnote{font-size:10.5px;color:var(--muted);white-space:nowrap}
@@ -835,15 +852,24 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
       </div>
 
 
-      <div class="kinrow off" id="kinRow">
-        <label class="kintog"><span class="sw"><input type="checkbox" id="kinOn"><span></span></span>Add Kinetics</label>
-        <div class="kt">
-          <label for="kinTa" title="Association time: how long protein and ligand are incubated before the plate is read">Time (s)</label>
-          <input type="number" id="kinTa" min="1" step="any" value="600">
-        </div>
-      </div>
       <div class="kinrow off" id="coopRow">
         <label class="kintog"><span class="sw"><input type="checkbox" id="coopOn"><span></span></span>Add Cooperativity</label>
+      </div>
+      <div class="kinrow off" id="kinRow">
+        <label class="kintog"><span class="sw"><input type="checkbox" id="kinOn"><span></span></span>Add Kinetics</label>
+        <span class="kmode" id="kinMode"></span>
+      </div>
+      <!-- shown only with kinetics on: the association time, and the optional
+           dissociation phase that turns the experiment into a surface one -->
+      <div class="ktimes off" id="kinTimes">
+        <div>
+          <label for="kinTa" title="Association time: how long protein and ligand are incubated before the read">Association (s)</label>
+          <input type="number" id="kinTa" min="1" step="any" value="600">
+        </div>
+        <div>
+          <label class="ktchk" title="Add a dissociation phase: a surface experiment such as SPR or BLI, where the ligand flows over immobilized protein and is then washed out"><input type="checkbox" id="surfOn">Dissociation (s)</label>
+          <input type="number" id="kinTd" min="1" step="any" value="600" aria-label="Dissociation time (s)" title="Dissociation time: how long the surface is washed with buffer after the association">
+        </div>
       </div>
         </div>
       <p class="calcnote calc-top" id="calcNote"><i></i>= calculated · click ○ to calculate that value instead</p>
@@ -970,7 +996,7 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
 
       <details class="panel kone" id="kinAcc" hidden>
         <summary>
-          <h2 class="ph2">Kinetics results</h2>
+          <h2 class="ph2">Steady-State Results</h2>
           <span class="kacc-sub" id="kinAccSub"></span>
           <span class="export kacc-x"><button type="button" id="kinAccCopy">Copy table</button>
             <span class="said" id="kinAccSaid" role="status" aria-live="polite"></span></span>
@@ -986,7 +1012,7 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
         <div>
           <h4>How it works</h4>
           <p>Each binding dataset is simulated from exact mass balance, using the true ligand K<sub>d</sub> (and Hill coefficient, with Add Cooperativity on). Gaussian error is added to every replicate each time you change the experiment, the way a repeat experiment would. The selected models are then fitted to those points by least squares.</p>
-<p>With Add Kinetics on, each ligand also gets rate constants, k<sub>on</sub> and k<sub>off</sub>. The association of protein and ligand is then calculated for each concentration, including depletion of both partners. Each well is read at the end of the shared association time instead of at equilibrium. A short incubation will produce pre-steady-state results and under report binding at equilibrium. The results table adds, for each ligand, the time every concentration takes to reach 95% of equilibrium.</p>
+<p>With Add Kinetics on, each ligand also gets rate constants, k<sub>on</sub> and k<sub>off</sub>. The association of protein and ligand is then calculated for each concentration, and each well is read at the end of the shared association time instead of at equilibrium. A short incubation will produce pre-steady-state results and under report binding at equilibrium. Ticking Dissociation turns this into a surface-bound experiment, such as SPR or BLI: after the association time the ligand is washed out, and each curve decays with k<sub>off</sub> for the dissociation time. The results table adds, for each ligand, the time every concentration takes to reach 95% of equilibrium.</p>
           <p>The equations are in <a class="cardlink" href="#modelsCard">The models</a>, and every symbol and column is defined in <a class="cardlink" href="#termsCard">Key terms</a>.</p>
         </div>
         <div>
@@ -997,35 +1023,13 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
             <li><b>Full saturation at 1.</b> Fit B<sub>max</sub> to treat the plateau as unknown.</li>
             <li><b>Constant Gaussian noise</b> with one SD and no outliers, so points can fall below 0 or above 1.</li>
             <li><b>Known, fully active [P]<sub>T</sub></b>, unless you fit it in the quadratic model.</li>
+            <li><b>Depletion in solution, none on a surface.</b> In solution both partners are drawn down as complex forms. Surface-bound (Dissociation ticked), the ligand flows past at a constant concentration and [P]<sub>T</sub> is not used.</li>
             <li><b>One unit throughout.</b> k<sub>on</sub> is per molar, so with kinetics the unit sets the time scale.</li>
           </ul>
         </div>
       </div>
       </div>
     </details>
-    <details class="note" id="modelsCard">
-      <summary><h3>The models</h3></summary>
-      <div class="nbody mcols">
-      <section>
-      <h4 class="msub">Equilibrium</h4>
-      <p>Each describes one ligand binding one kind of site and gives the fraction bound as f = B<sub>max</sub>·θ, where θ is the occupancy the model predicts and B<sub>max</sub> is the plateau the signal reaches at saturation.</p>
-      <p class="eq"><span class="cm">specific binding</span>f = B<sub>max</sub> L<sub>T</sub> ⁄ ( K<sub>d</sub> + L<sub>T</sub> )</p>
-      <p class="eq"><span class="cm">Hill model (Fit n)</span>f = B<sub>max</sub> L<sub>T</sub><sup>n</sup> ⁄ ( K + L<sub>T</sub><sup>n</sup> ), &nbsp;K<sub>d</sub> = K<sup>1/n</sup></p>
-      <p class="eq"><span class="cm">quadratic 1:1</span>f = B<sub>max</sub> [ (P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>) − <span class="rad">√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>)</span> ] ⁄ 2P<sub>T</sub></p>
-      <p>Specific binding and the Hill model assume free ligand equals what you pipetted in; the Hill model adds a slope n for cooperativity, and its K<sub>d</sub> is the half-saturating concentration. The quadratic solves mass balance for both partners, so it needs [P]<sub>T</sub> and is strictly 1:1 — there is no Hill exponent to fit.</p>
-      </section>
-      <section>
-      <h4 class="msub">Kinetics</h4>
-      <p>Add Kinetics follows the same 1:1 binding through time. Protein and ligand are mixed at t = 0 and bind in a single step; both are drawn down as complex forms, so the solution is exact at any concentration.</p>
-      <p class="eq"><span class="cm">reaction</span>P + L ⇌ PL, &nbsp;K<sub>d</sub> = k<sub>off</sub> ⁄ k<sub>on</sub></p>
-      <p class="eq"><span class="cm">rate</span>d[PL]/dt = k<sub>on</sub>[P][L] − k<sub>off</sub>[PL]</p>
-      <p class="eq"><span class="cm">solution</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
-      <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub><span class="rad">√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
-      <p>C<sub>1</sub> and C<sub>2</sub> are the two roots of the quadratic; C<sub>1</sub> is the equilibrium complex the quadratic 1:1 model predicts. When protein is dilute this reduces to f(t) = f<sub>eq</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) with k<sub>obs</sub> = k<sub>on</sub>[L] + k<sub>off</sub>.</p>
-      </section>
-      </div>
-    </details>
-
     <details class="note wide" id="termsCard">
       <summary><h3>Key terms</h3></summary>
       <div class="nbody">
@@ -1045,14 +1049,73 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
   <li><b>±</b> — asymptotic standard error: how tightly <em>this</em> dataset pins the value. A wrong model can fit precisely.</li>
   <li><b>RMSE</b> — root-mean-square residual over every replicate point. A correct model lands near the noise SD.</li>
   <li><b>k<sub>on</sub> (M⁻¹s⁻¹)</b>, <b>k<sub>off</sub> (s⁻¹)</b> — association and dissociation rate constants, tied to the K<sub>d</sub> by K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>. Enter one; the dot marks the one calculated from the other.</li>
-  <li><b>Association time</b> — how long protein and ligand are incubated before the read. Shared by every ligand. The equilibrium curve is read at this time, so a short incubation shows up in the fit.</li>
+  <li><b>Association time</b> — how long protein and ligand are incubated before the read; <em>in solution</em> unless Dissociation is ticked. Shared by every ligand. The equilibrium curve is read at this time, so a short incubation shows up in the fit.</li>
   <li><b>k<sub>obs</sub> (s⁻¹)</b> — the rate of approach to equilibrium, k<sub>on</sub>·√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>). Without depletion this is k<sub>on</sub>[L] + k<sub>off</sub>.</li>
   <li><b>Steady-state</b> — the plateau the association reaches once binding and unbinding balance; for simple 1:1 binding it is the equilibrium the curve is meant to measure. Points read before they get there are pre-steady-state and under-report binding. In the results table, the Steady-state columns give the time to reach it (t<sub>eq</sub>) and how close the top and bottom of the series are at the read (f/f<sub>eq</sub> at [L]<sub>max</sub> and [L]<sub>min</sub>).</li>
   <li><b>t<sub>eq</sub> (95%)</b> — time to reach 95% of the equilibrium fraction bound; ≈ ln 20 / k<sub>obs</sub>. The ligand's row gives the slowest point in the series: the minimum incubation time.</li>
   <li><b>f<sub>eq</sub>, f<sub>end</sub></b> — fraction of protein bound at equilibrium, and at the end of the association time.</li>
-  <li><b>f/f<sub>eq</sub> (%)</b> — how close a point got to equilibrium by the read (f<sub>end</sub>/f<sub>eq</sub> in the kinetics results). Under 95%, shown in red, means that point is still rising when read.</li>
+  <li><b>f/f<sub>eq</sub> (%)</b> — how close a point got to equilibrium by the read (f<sub>end</sub>/f<sub>eq</sub> in the Steady-State Results). Under 95%, shown in red, means that point is still rising when read.</li>
   <li><b>t½</b> — complex half-life, ln 2/k<sub>off</sub>.</li>
+  <li><b>Dissociation time</b>, <b>surface-bound (SPR/BLI)</b> — with Dissociation ticked, the simulation becomes a surface binding experiment, such as surface plasmon resonance or biolayer interferometry. The ligand flows over immobilized protein at a fixed concentration, so there is no depletion; after the association time it is replaced by buffer and the bound fraction decays as f<sub>end</sub>·e<sup>−k<sub>off</sub>t</sup>. The equilibrium curve is the response at the end of the association.</li>
       </ul>
+      </div>
+    </details>
+    <details class="note" id="modelsCard">
+      <summary><h3>The models</h3></summary>
+      <div class="nbody mcols">
+      <section>
+      <h4 class="msub">Equilibrium</h4>
+      <p>Each describes one ligand binding one kind of site and gives the fraction bound as f = B<sub>max</sub>·θ, where θ is the occupancy the model predicts and B<sub>max</sub> is the plateau the signal reaches at saturation.</p>
+      <p class="eq"><span class="cm">specific binding</span>f = B<sub>max</sub> L<sub>T</sub> ⁄ ( K<sub>d</sub> + L<sub>T</sub> )</p>
+      <p class="eq"><span class="cm">Hill model (Fit n)</span>f = B<sub>max</sub> L<sub>T</sub><sup>n</sup> ⁄ ( K + L<sub>T</sub><sup>n</sup> ), &nbsp;K<sub>d</sub> = K<sup>1/n</sup></p>
+      <p class="eq"><span class="cm">quadratic 1:1</span>f = B<sub>max</sub> [ (P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>) − <span class="rad">√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>)</span> ] ⁄ 2P<sub>T</sub></p>
+      <p>Specific binding and the Hill model assume free ligand equals what you pipetted in; the Hill model adds a slope n for cooperativity, and its K<sub>d</sub> is the half-saturating concentration. The quadratic solves mass balance for both partners, so it needs [P]<sub>T</sub> and is strictly 1:1 — there is no Hill exponent to fit.</p>
+      </section>
+      <section>
+      <h4 class="msub">Kinetics</h4>
+      <p>The same 1:1 binding, followed through time.</p>
+      <p class="eq"><span class="cm">reaction</span>P + L ⇌ PL, &nbsp;K<sub>d</sub> = k<sub>off</sub> ⁄ k<sub>on</sub></p>
+      <p class="eq"><span class="cm">rate</span>d[PL]/dt = k<sub>on</sub>[P][L] − k<sub>off</sub>[PL]</p>
+      <p><b>In solution</b>, where C<sub>1</sub> and C<sub>2</sub> are the roots of the quadratic and C<sub>1</sub> is the equilibrium complex (derived in <a class="cardlink" href="#rateCard">Rate equations with depletion</a>):</p>
+      <p class="eq"><span class="cm">association</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
+      <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub><span class="rad">√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
+      <p><b>Surface-bound (SPR/BLI)</b>, where t<sub>a</sub> is the association time:</p>
+      <p class="eq"><span class="cm">association</span>f(t) = f<sub>eq</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>), &nbsp;k<sub>obs</sub> = k<sub>on</sub>[L] + k<sub>off</sub></p>
+      <p class="eq"><span class="cm">steady state</span>f<sub>eq</sub> = [L] ⁄ ( K<sub>d</sub> + [L] )</p>
+      <p class="eq"><span class="cm">dissociation</span>f(t) = f(t<sub>a</sub>)·e<sup>−k<sub>off</sub>(t − t<sub>a</sub>)</sup></p>
+      </section>
+      </div>
+    </details>
+
+    <details class="note" id="rateCard">
+      <summary><h3>Rate equations with depletion</h3></summary>
+      <div class="nbody mcols">
+      <section>
+      <h4 class="msub">1 · The rate equation</h4>
+      <p>Let x = [PL]. Every complex formed uses up one protein and one ligand, so the free concentrations fall as x rises.</p>
+      <p class="eq"><span class="cm">free partners</span>[P] = P<sub>T</sub> − x, &nbsp;[L] = L<sub>T</sub> − x</p>
+      <p class="eq"><span class="cm">rate</span>dx/dt = k<sub>on</sub>(P<sub>T</sub> − x)(L<sub>T</sub> − x) − k<sub>off</sub>x</p>
+      <p>Factor out k<sub>on</sub> and use K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>:</p>
+      <p class="eq"><span class="cm">rearranged</span>dx/dt = k<sub>on</sub>[ x² − (P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>)x + P<sub>T</sub>L<sub>T</sub> ]</p>
+      <h4 class="msub">2 · The quadratic and its two roots</h4>
+      <p>The bracket is a quadratic in x, so it factors as (x − C<sub>1</sub>)(x − C<sub>2</sub>). With b = P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>:</p>
+      <p class="eq"><span class="cm">smaller root</span>C<sub>1</sub> = ( b − <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
+      <p class="eq"><span class="cm">larger root</span>C<sub>2</sub> = ( b + <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
+      <p><b>C<sub>1</sub> is the equilibrium complex.</b> It is where dx/dt = 0, the same [PL] the quadratic 1:1 model gives. <b>C<sub>2</sub> is a mathematical root only.</b> It is larger than P<sub>T</sub> or L<sub>T</sub>, so the system never gets there, but it still shapes the curve. Two identities are useful: C<sub>1</sub>C<sub>2</sub> = P<sub>T</sub>L<sub>T</sub>, and C<sub>2</sub> − C<sub>1</sub> = <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span>.</p>
+      </section>
+      <section>
+      <h4 class="msub">3 · Solving it</h4>
+      <p>dx/dt = k<sub>on</sub>(x − C<sub>1</sub>)(x − C<sub>2</sub>) separates and integrates exactly. Starting from x = 0 at t = 0:</p>
+      <p class="eq"><span class="cm">association</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
+      <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub>(C<sub>2</sub> − C<sub>1</sub>) = k<sub>on</sub><span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
+      <h4 class="msub">4 · Sanity checks</h4>
+      <p><b>At t = 0</b>, e<sup>0</sup> = 1, so the numerator is 0 and [PL] = 0.</p>
+      <p><b>As t → ∞</b>, the exponential goes to 0, so [PL] → C<sub>1</sub>C<sub>2</sub>/C<sub>2</sub> = C<sub>1</sub>, the equilibrium complex.</p>
+      <p><b>With dilute protein</b> (P<sub>T</sub> ≪ L<sub>T</sub> + K<sub>d</sub>), C<sub>1</sub> is tiny next to C<sub>2</sub> ≈ L<sub>T</sub> + K<sub>d</sub>, so the C<sub>1</sub> term in the denominator drops out and the familiar single exponential remains:</p>
+      <p class="eq"><span class="cm">dilute limit</span>[PL](t) ≈ C<sub>1</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>), &nbsp;k<sub>obs</sub> ≈ k<sub>on</sub>[L] + k<sub>off</sub></p>
+      <h4 class="msub">Why depletion bends the curve</h4>
+      <p>When protein is comparable to K<sub>d</sub> or to the ligand, the C<sub>1</sub> term in the denominator matters. As complex forms, free ligand runs down, so binding slows more than a single exponential predicts and k<sub>obs</sub> is no longer k<sub>on</sub>[L] + k<sub>off</sub>. The simulator computes C<sub>2</sub> from the square root and then C<sub>1</sub> = P<sub>T</sub>L<sub>T</sub>/C<sub>2</sub>, which avoids rounding error when C<sub>1</sub> is very small.</p>
+      </section>
       </div>
     </details>
 
@@ -1063,6 +1126,7 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
 
   <footer>
     <p class="credit"><b>Kelly Arnett</b> · <a href="https://cmi.hms.harvard.edu/" target="_blank" rel="noopener noreferrer">Center for Macromolecular Interactions (CMI)</a>, Harvard Medical School</p>
+    <p class="madewith">Built with Claude Opus 5.5 (Anthropic)</p>
   </footer>
 </div>
 
@@ -1100,6 +1164,10 @@ var state = {
   // cooperativity: off by default; while off every ligand binds 1:1 (n = 1)
   coop: false,
   ta: 600,
+  // surface (SPR/BLI) format, only while kinetics is on: the ligand flows over
+  // immobilized protein, so it is never depleted; td is the dissociation time (s)
+  surf: false,
+  td: 600,
   // layout preview and, with kinetics on, which curve tab is showing
   layout: 'A',
   tab: 'eq',
@@ -1109,6 +1177,12 @@ var state = {
     { name:'Ligand C', on:false, pt:0.05, kd:500, n:1, min:6.104,   max:50000, reps:3 }
   ]
 };
+// the starting settings, so a scenario always begins from the same place
+var DEFAULTS = JSON.parse(JSON.stringify(state));
+function resetState(){
+  var d = JSON.parse(JSON.stringify(DEFAULTS));
+  Object.keys(d).forEach(function(k){ if (k !== 'layout') state[k] = d[k]; });
+}
 
 var SCENARIOS = [
   { key:'ideal', title:'Ideal conditions',
@@ -1139,10 +1213,25 @@ var SCENARIOS = [
       state.sd = 0.02;
       // a 1 nM binder with koff = 1e-4 /s (kon 1e5): the lowest points need
       // ~8 h to settle, but the plate is read at 10 min
-      state.kin = true; state.ta = 600; state.tab = 'eq';
+      state.kin = true; state.surf = false; state.ta = 600; state.tab = 'eq';
       state.ligands[0] = { name:'Ligand A', on:true,  pt:0.05, kd:1,  n:1, min:0.01221, max:100,  reps:3, kon:1e5, koff:1e-4, kcalc:'on' };
       state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10, n:1, min:0.1221,  max:1000, reps:3, kon:1e6, koff:1e-2, kcalc:'off' };
       state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:100,n:1, min:1.221,   max:10000,reps:3, kon:1e6, koff:1e-1, kcalc:'off' };
+    } },
+  { key:'antibody', title:'High affinity surface-bound kinetics',
+    blurb:'Kd 0.1 nM, koff 5e-5 /s on a sensor surface',
+    sets:{ rates:true },
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.02;
+      // a tight, slow-off binder (kon 5e5 /M/s follows from Kd and koff):
+      // 7 two-fold steps down from 10 nM, 10 min of association, then 30 min
+      // of buffer, in which ~9% of the complex dissociates
+      state.points = 7;
+      state.kin = true; state.surf = true; state.ta = 600; state.td = 1800; state.tab = 'kin';
+      state.ligands[0] = { name:'Ligand A', on:true,  pt:0.05, kd:0.1, n:1, min:0.15625, max:10, dil:2, reps:3, kon:5e5, koff:5e-5, kcalc:'on' };
+      state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10,  n:1, min:0.1221,  max:1000, reps:3, kon:1e6, koff:1e-2, kcalc:'off' };
+      state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:100, n:1, min:1.221,   max:10000,reps:3, kon:1e6, koff:1e-1, kcalc:'off' };
     } },
   { key:'hill', title:'Cooperativity',
     blurb:'3 curves with variable hill slopes',
@@ -1204,8 +1293,12 @@ function boundFrac(Pt, Lt, Kd, n){
 // With Add Kinetics on, each well is read at the end of the association
 // time, so it carries only the fraction of the way to equilibrium the 1:1
 // kinetics have covered by then (the Hill n still sets the end point).
+function surfOn(){ return state.kin && state.surf; }
+// the protein concentration the simulation sees: none in a surface experiment,
+// where the flowing ligand is never depleted
+function ptOf(L){ return surfOn() ? 0 : Math.max(0, num(L.pt, 0)); }
 function readAt(L, x){
-  var pt = Math.max(0, num(L.pt, 0)), f = boundFrac(pt, x, L.kd, hn(L));
+  var pt = ptOf(L), f = boundFrac(pt, x, L.kd, hn(L));
   if (!state.kin || !(L.kon > 0)) return f;
   return f * kinPoint(pt, x, L.kd, L.kon).prog(state.ta);
 }
@@ -1413,7 +1506,7 @@ function seAt(C, j){
 // concentration^n. The search runs on the half-saturating concentration
 // Khalf = K^(1/n), which is the same curve family but far better conditioned.
 function fitLigand(L, sim){
-  var out = [], pt = Math.max(0, num(L.pt, 0)), f, at, th, C, g0, g1, v, seK, iB;
+  var out = [], pt = ptOf(L), f, at, th, C, g0, g1, v, seK, iB;
 
   if (state.fitSpecific){
     var fitB = state.bmaxSpec;
@@ -1568,7 +1661,7 @@ function sizePlot(){ layoutSizes(); }
 // but always stay landscape: the plotting area is never taller than 1/1.3 of
 // its width, and never more than 2.4x wider than tall (centred instead).
 var ASPECT_MIN = 1.15, ASPECT_MAX = 2.2, KIN_SHARE = 0.72;
-var EXTRA_H = 50;
+var EXTRA_H = 10;
 function layoutSizes(){
   var stage = document.getElementById('stage'), main = document.querySelector('.stage .main');
   var svg = document.getElementById('plot'), kc = document.getElementById('kinChart');
@@ -1753,7 +1846,7 @@ function draw(){
   // while the wells are read before equilibrium, the true equilibrium curve
   // sits faintly underneath, so the gap the incubation leaves is visible
   if (state.kin) back.forEach(function(g){
-    var gc = col(g.idx % 3), pt = Math.max(0, num(g.L.pt, 0));
+    var gc = col(g.idx % 3), pt = ptOf(g.L);
     var ys = xs.map(function(x){ return boundFrac(pt, x, g.L.kd, hn(g.L)); });
     s += '<path class="truecurve" d="' + pathOf(xs, ys, d) + '" stroke="' + gc + '"/>';
   });
@@ -1761,7 +1854,7 @@ function draw(){
   // fitted curves: the solid specific-binding curve first, so the dotted
   // quadratic stays visible on top where the two agree
   back.forEach(function(g){
-    var gc = col(g.idx % 3), pt = Math.max(0, num(g.L.pt, 0));
+    var gc = col(g.idx % 3), pt = ptOf(g.L);
     g.fits.slice().sort(function(a){ return a.model === 'quadratic' ? 1 : -1; }).forEach(function(f){
       var B = num(f.B, 1);
       var ys = xs.map(function(x){
@@ -1825,7 +1918,7 @@ function hideTip(){
 
 // value of one fitted curve at x, the same expression the curve is drawn from
 function predict(g, f, x){
-  var pt = Math.max(0, num(g.L.pt, 0)), B = num(f.B, 1);
+  var pt = ptOf(g.L), B = num(f.B, 1);
   return B * (f.model === 'quadratic' ? boundFrac(f.fittedPt ? f.pt : pt, x, f.kHalf, 1) : thetaHill(x, f.kHalf, f.n));
 }
 
@@ -1992,8 +2085,14 @@ function kinPoint(Pt, Lt, Kd, kon){
     return C2 > 0 ? C2 * (1 - E) / (C2 - C1 * E) : 1 - E;
   };
   var E95 = C2 > 0 ? 0.05 * C2 / (C2 - 0.95 * C1) : 0.05;
-  return { Lt: Lt, feq: feq, kobs: r, t95: r > 0 ? -Math.log(E95) / r : Infinity, prog: prog,
-           f: function(t){ return feq * prog(t); } };
+  // surface format: after the association time the ligand is washed out and
+  // the complex decays with koff alone
+  var koff = kon * Kd * toM(), ta = state.ta, diss = surfOn();
+  return { Lt: Lt, feq: feq, kobs: r, koff: koff, t95: r > 0 ? -Math.log(E95) / r : Infinity, prog: prog,
+           f: function(t){
+             if (diss && t > ta) return feq * prog(ta) * Math.exp(-koff * (t - ta));
+             return feq * prog(t);
+           } };
 }
 
 function sci(v){
@@ -2075,7 +2174,7 @@ var kinCache = null, kgeom = null;
 function kinData(){
   if (!cache) return [];
   return cache.groups.map(function(g){
-    var L = g.L, pt = Math.max(0, num(L.pt, 0));
+    var L = g.L, pt = ptOf(L);
     var pts = g.sim.pts.map(function(p){ return kinPoint(pt, p.x, L.kd, L.kon); }).reverse();  // high -> low
     return { idx: g.idx, name: g.name, L: L, pt: pt, pts: pts };
   });
@@ -2148,24 +2247,31 @@ function drawKin(){
   // the same frame, y scale and type as the equilibrium plot, so the two
   // panels line up gridline for gridline when they sit side by side
   var m = { l: M.l, r: M.r, t: M.t, b: M.b }, iw = W - m.l - m.r, ih = H - m.t - m.b;
-  var t1 = state.ta, unitMin = t1 > 1800, ay = m.t + ih;
+  var diss = surfOn(), ta = state.ta;
+  var t1 = ta + (diss ? state.td : 0), unitMin = t1 > 1800, ay = m.t + ih;
   var x = function(t){ return m.l + t / t1 * iw; };
   var y = function(v){ return m.t + ih - (v - Y0) / (Y1 - Y0) * ih; };
   kgeom = { x: x, y: y, m: m, iw: iw, ih: ih, t1: t1, W: W, H: H };
   box.style.width = W + 'px';
 
-  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="max-width:' + W + 'px;margin-inline:auto" role="img" aria-label="Fraction of protein bound versus time during association, one curve per ligand concentration">';
-  s += '<rect x="' + m.l + '" y="' + m.t + '" width="' + iw + '" height="' + ih + '" fill="var(--assoc)"/>';
-  s += '<text x="' + (m.l + 8) + '" y="' + (m.t + 14) + '" fill="var(--muted)" font-size="11" font-family="var(--sans)" font-weight="600" letter-spacing="0.06em">ASSOCIATION</text>';
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="max-width:' + W + 'px;margin-inline:auto" role="img" aria-label="Fraction of protein bound versus time during association' + (diss ? ' and dissociation' : '') + ', one curve per ligand concentration">';
+  var phaseLab = function(px, txt){
+    return '<text x="' + (px + 8) + '" y="' + (m.t + 14) + '" fill="var(--muted)" font-size="11" font-family="var(--sans)" font-weight="600" letter-spacing="0.06em">' + txt + '</text>';
+  };
+  s += '<rect x="' + m.l + '" y="' + m.t + '" width="' + (x(ta) - m.l) + '" height="' + ih + '" fill="var(--assoc)"/>';
+  s += phaseLab(m.l, 'ASSOCIATION');
+  if (diss) s += phaseLab(x(ta), 'DISSOCIATION');
   [0, 0.25, 0.5, 0.75, 1].forEach(function(v){
     s += '<line x1="' + m.l + '" x2="' + (m.l + iw) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="gridline"/>';
     s += '<text x="' + (m.l - 12) + '" y="' + (y(v) + 5) + '" text-anchor="end" class="tick">' + v.toFixed(2) + '</text>';
   });
-  niceTicks(0, t1, narrow ? 4 : 6).forEach(function(v){
+  // in minutes once the run is long, ticks fall on round minutes
+  (unitMin ? niceTicks(0, t1 / 60, narrow ? 4 : 6).map(function(v){ return v * 60; }) : niceTicks(0, t1, narrow ? 4 : 6)).forEach(function(v){
     s += '<line class="gridline" x1="' + x(v) + '" x2="' + x(v) + '" y1="' + m.t + '" y2="' + ay + '"/>';
     s += '<text x="' + x(v) + '" y="' + (ay + 28) + '" text-anchor="middle" class="tick">' +
       (unitMin ? +(v / 60).toPrecision(3) : v) + '</text>';
   });
+  if (diss) s += '<line x1="' + x(ta) + '" x2="' + x(ta) + '" y1="' + m.t + '" y2="' + ay + '" class="hair"/>';
   s += '<line class="axisline" x1="' + m.l + '" x2="' + (m.l + iw) + '" y1="' + ay + '" y2="' + ay + '"/>';
   s += '<line class="axisline" x1="' + m.l + '" x2="' + m.l + '" y1="' + m.t + '" y2="' + ay + '"/>';
   s += '<text x="' + (m.l + iw / 2) + '" y="' + (H - 8) + '" text-anchor="middle" class="alab">time (' + (unitMin ? 'm' : 's') + ')</text>';
@@ -2173,6 +2279,8 @@ function drawKin(){
 
   var N = 240, ts = [];
   for (var j = 0; j <= N; j++) ts.push(t1 * j / N);
+  // a sample exactly at the switch, so the peak of every curve is drawn sharp
+  if (diss){ ts.push(ta); ts.sort(function(a, b){ return a - b; }); }
   // C under B under A, lowest concentration at the back of each ligand
   kinCache.slice().reverse().forEach(function(g){
     var n = g.pts.length;
@@ -2194,7 +2302,7 @@ function drawKin(){
     var n = g.pts.length, ramp = '';
     for (var q = 0; q < Math.min(n, 8); q++) ramp += '<i style="background:' + shade(g.idx, Math.round(q * (n - 1) / Math.max(1, Math.min(n, 8) - 1)), n) + '"></i>';
     return '<span class="kk"><span class="ramp">' + ramp + '</span><b>' + esc(g.name) + '</b></span>';
-  }).join('') + (kinCache.length ? '<span class="knote">darkest = highest [L]<sub>T</sub> · true kinetics, no noise</span>' : '<span>Switch on a ligand to simulate its association.</span>');
+  }).join('') + (kinCache.length ? '<span class="knote">darkest = highest [L]<sub>T</sub> · true kinetics, no noise' + (diss ? ' · surface: no depletion' : '') + '</span>' : '<span>Switch on a ligand to simulate its association.</span>');
 }
 
 function bindKinHover(){
@@ -2224,7 +2332,8 @@ function bindKinHover(){
       });
     });
     hd.innerHTML = dots;
-    var tl = 't = ' + (t >= 100 ? t.toFixed(0) : t.toFixed(1)) + ' s' + (t >= 120 ? ' (' + dur(t) + ')' : '');
+    var tl = 't = ' + (t >= 100 ? t.toFixed(0) : t.toFixed(1)) + ' s' + (t >= 120 ? ' (' + dur(t) + ')' : '') +
+      (surfOn() ? (t > state.ta ? ' · dissociation' : ' · association') : '');
     tip.innerHTML = '<div class="kt0">' + tl + '</div><div class="kr th"><span>[L]<sub>T</sub></span><span>f<sub>t</sub></span><span>f<sub>t</sub>/f<sub>eq</sub></span></div>' + rows;
     tip.hidden = false;
     var cw = box.clientWidth, tw = tip.offsetWidth, cx = ev.clientX - box.getBoundingClientRect().left;
@@ -2277,7 +2386,7 @@ function eqNotes(){
   if (!G.length) return notes;
   var many = G.length > 1;
   var D = G.map(function(g){
-    var L = g.L, pt = Math.max(0, num(L.pt, 0)), kd = num(L.kd, 1), n = hn(L);
+    var L = g.L, pt = ptOf(L), kd = num(L.kd, 1), n = hn(L);
     var f = function(x){ return boundFrac(pt, x, kd, n); };
     var xs = g.sim.pts.map(function(p){ return p.x; });
     return { g: g, tag: ligTag(g.idx, g.name), pt: pt, kd: kd, n: n,
@@ -2313,7 +2422,7 @@ function eqNotes(){
     '. Use a smaller dilution factor or more points so the slope is sampled.');
   var range = D.map(function(x){ return (many ? x.tag + ' runs ' : 'It runs from ') + pct(x.bot) + ' to ' + pct(x.top) + ' bound with ' + x.mid + ' points between 10% and 90%'; }).join('; ');
   if (!notes.length) notes.push('<b>' + (many ? 'Every titration is' : 'The titration is') + ' well designed' + (state.kin ? ' at equilibrium' : '') + '.</b> ' +
-    range + ', and [P]<sub>T</sub> is low enough that the curve midpoint reports the K<sub>d</sub>.');
+    range + (surfOn() ? ', and with no depletion on the surface the curve midpoint reports the K<sub>d</sub>.' : ', and [P]<sub>T</sub> is low enough that the curve midpoint reports the K<sub>d</sub>.'));
   // with kinetics on, the curve is only an equilibrium measurement if every
   // point has got there by the read
   if (state.kin){
@@ -2325,7 +2434,12 @@ function eqNotes(){
       K.pts.forEach(function(P){ var v = P.feq > 0 ? 100 * P.f(ta) / P.feq : 100; if (v < worst) worst = v; });
       return worst < 95 ? { x: x, worst: worst, slow: det.slow } : null;
     }).filter(Boolean);
-    if (short.length) notes.push('<b>The curve is not at equilibrium when read.</b> ' + short.map(function(o){
+    if (short.length && surfOn()) notes.push('<b>The steady-state curve has not reached equilibrium.</b> ' + short.map(function(o){
+        var f = o.x.g.fits[0];
+        return o.x.tag + ' reaches only ' + Math.round(o.worst) + '% of equilibrium at its lowest points after ' + dur(ta) +
+          (f ? ', so a steady-state fit gives K<sub>d</sub> = ' + fmt(f.kHalf, 3) + ' ' + u + ' against the true ' + fmt(o.x.kd, 3) + ' ' + u : ''); }).join('. ') +
+      '. This matters only for steady-state affinity analysis; the kinetic fit takes K<sub>d</sub> from k<sub>off</sub>/k<sub>on</sub> and does not need equilibrium.');
+    else if (short.length) notes.push('<b>The curve is not at equilibrium when read.</b> ' + short.map(function(o){
         var f = o.x.g.fits.filter(function(m){ return m.model === 'quadratic'; })[0] || o.x.g.fits[0];
         return o.x.tag + ' reaches only ' + Math.round(o.worst) + '% of equilibrium at its lowest points after ' + dur(ta) +
           (f ? ', so its fitted K<sub>d</sub> (' + fmt(f.kHalf, 3) + ' ' + u + ') ' +
@@ -2345,11 +2459,11 @@ function renderDesignNotes(){
   var block = function(title, list){
     return '<div class="rc-notes dcol"><h4>' + title + '</h4>' + list.map(function(n){ return '<p>' + n + '</p>'; }).join('') + '</div>';
   };
-  var kd = state.kin ? kinData() : [];
+  var kd = surfOn() ? kinData() : [];
   var kn = kd.length ? kinNotes(kd) : [];
-  host.innerHTML = block('Equilibrium', eq) + (kn.length ? block('Kinetics · read at ' + dur(state.ta), kn) : '');
+  host.innerHTML = block('Equilibrium', eq) + (kn.length ? block('Kinetics · surface-bound', kn) : '');
   // the closed accordion still says whether anything needs attention
-  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|Not every point|Depletion shapes)/;
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|Not every point|Depletion shapes|Too little dissociation|Association is too short)/;
   var n = eq.concat(kn).filter(function(t){ return problem.test(t); }).length;
   document.getElementById('designSub').innerHTML = n
     ? '<span class="bad">' + n + (n === 1 ? ' issue' : ' issues') + '</span> to review'
@@ -2358,41 +2472,48 @@ function renderDesignNotes(){
 
 // The kinetic design notes for every ligand together:
 // each point is made once, naming the ligands it applies to.
+// Design notes for a fitted kinetic experiment, surface-bound (SPR/BLI) only:
+// in solution the read-at-a-time problem is already in the equilibrium notes.
+// A kinetic fit needs curvature in the association and decay in the
+// dissociation, not equilibrium.
 function kinNotes(kd){
-  var ta = state.ta, many = kd.length > 1;
-  var D = kd.map(function(K){ return { K: K, d: kinDetail(K) }; });
+  var ta = state.ta, td = state.td, many = kd.length > 1, notes = [];
+  var D = kd.map(function(K){ return { K: K }; });
   var who = function(list, fn){
     return list.map(function(x){ return (many ? tag(x) + ' ' : '') + fn(x); }).join(', ');
   };
   // a ligand named where something needs fixing carries its colour
   var tag = function(x){ return ligTag(x.K.idx, x.K.name); };
-  var slowest = D.reduce(function(a, x){ return !a || x.d.slow > a.d.slow ? x : a; }, null);
-  var short = D.filter(function(x){ return !x.d.allEq; });
-  var notes = [];
-  if (!short.length){
-    notes.push('<b>Every point reaches equilibrium</b> within the ' + dur(ta) + ' association time. The slowest' +
-      (many ? ' (' + tag(slowest) + ')' : '') + ' needs ' + dur(slowest.d.slow) + ', so incubate at least that long before reading.');
-  } else {
-    var low = short.some(function(x){ return x.d.anyLow; });
-    notes.push('<b>Not every point reaches equilibrium</b> after ' + dur(ta) +
-      ' (' + short.map(function(x){ return tag(x) + ' needs ' + dur(x.d.slow); }).join(', ') + ')' +
-      '. The equilibrium curve is read at this time, so the slow, low-concentration points are under-bound' +
-      (low ? ' and the fitted K<sub>d</sub> is biased high' : '') +
-      '. Incubate for at least ' + dur(slowest.d.slow) + '.');
-  }
-  notes.push('<b>The lowest concentrations are slowest.</b> As [L] → 0, t<sub>eq</sub> approaches ln 20 / k<sub>off</sub>' +
-    (many ? ': ' : ' = ') + who(D, function(x){ return dur(Math.log(20) / x.K.L.koff); }) +
-    '. A tighter binder at the same k<sub>on</sub> has a smaller k<sub>off</sub> and needs a longer incubation.');
-  var dep = D.filter(function(x){ return x.K.pt > 0.1 * x.K.L.kd; });
-  if (dep.length) notes.push('<b>Depletion shapes the kinetics</b>' +
-    ' for ' + dep.map(tag).join(', ') +
-    ': [P]<sub>T</sub> is ' + dep.map(function(x){ return sci(x.K.pt / x.K.L.kd); }).join(', ') +
-    '× K<sub>d</sub>, so binding draws down free ligand, the approach is not a single exponential, and k<sub>obs</sub> is not k<sub>on</sub>[L] + k<sub>off</sub>.');
+  var pc = function(v){ var p = 100 * v; return (p >= 99.95 ? '100' : p < 10 ? p.toFixed(1) : p.toFixed(0)) + '%'; };
+  notes.push('<b>Equilibrium is not needed for a kinetic fit.</b> Fitting the association and dissociation curves together gives k<sub>on</sub> and k<sub>off</sub>, and K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>, as long as the association curves bend and the dissociation curves decay measurably.');
+  // association: the top concentration must bend toward its plateau, or kon
+  // and koff cannot be told apart
+  var top = function(x){ return x.K.pts[0]; };          // pts run high -> low
+  var reach = function(x){ return 1 - Math.exp(-top(x).kobs * ta); };
+  var flat = D.filter(function(x){ return top(x) && top(x).kobs * ta < 1; });
+  if (flat.length) notes.push('<b>Association is too short to show curvature</b>' +
+    (many ? ' for ' + flat.map(tag).join(', ') : '') + ': even the highest concentration reaches only ' +
+    flat.map(function(x){ return pc(reach(x)); }).join(', ') +
+    ' of its plateau in ' + dur(ta) + ', so the curves are nearly straight and k<sub>on</sub> cannot be separated from k<sub>off</sub>. ' +
+    'Extend the association to at least ' + flat.map(function(x){ return dur(3 / top(x).kobs); }).join(', ') +
+    ' (95% of the plateau at the top concentration), or raise [L]<sub>max</sub>.');
+  else notes.push('<b>Association shows curvature</b>: the highest concentration reaches ' +
+    who(D, function(x){ return pc(reach(x)); }) + ' of its plateau in ' + dur(ta) +
+    ', enough to define k<sub>on</sub>. The lower concentrations need not reach theirs.');
+  // dissociation: enough decay to fit koff
+  var fr = function(x){ return 1 - Math.exp(-x.K.L.koff * td); };
+  var little = D.filter(function(x){ return fr(x) < 0.05; });
+  if (little.length) notes.push('<b>Too little dissociation to measure k<sub>off</sub></b>' +
+    (many ? ' for ' + little.map(tag).join(', ') : '') + ': only ' + little.map(function(x){ return pc(fr(x)); }).join(', ') +
+    ' of the complex dissociates in ' + dur(td) + '. Aim for at least 5% decay; one half-life (t½ = ' +
+    little.map(function(x){ return dur(Math.LN2 / x.K.L.koff); }).join(', ') + ') gives 50%.');
+  else notes.push('<b>Dissociation is long enough to define k<sub>off</sub></b>: ' +
+    who(D, function(x){ return pc(fr(x)); }) + ' of the complex dissociates in ' + dur(td) + '.');
   return notes;
 }
 
 function kinTSV(){
-  var t1 = state.ta, N = 500, head = ['Time (s)'], cols = [];
+  var t1 = state.ta + (surfOn() ? state.td : 0), N = 500, head = ['Time (s)'], cols = [];
   kinCache.forEach(function(g){
     g.pts.forEach(function(P){ head.push(g.name + ' ' + sig(P.Lt) + ' ' + state.unit + ' (f)'); cols.push(P); });
   });
@@ -2733,7 +2854,7 @@ function renderResultsW(){
   // bottom of the series have got by the time the plate is read
   var kinCols = ['t<sub>eq</sub> (95%)', 'f/f<sub>eq</sub> [L]<sub>max</sub>', 'f/f<sub>eq</sub> [L]<sub>min</sub>'];
   if (kin){
-    h1 += '<th class="grpth gl" colspan="' + kinCols.length + '"><a href="#kinAcc" class="tolink" title="Open the kinetics results for every concentration">Steady-state</a></th>';
+    h1 += '<th class="grpth gl" colspan="' + kinCols.length + '"><a href="#kinAcc" class="tolink" title="Open the Steady-State Results for every concentration">Steady-state</a></th>';
     kinCols.forEach(function(t, i){ h2 += '<th' + (i === 0 ? ' class="gl"' : '') + '><span class="sym">' + t + '</span></th>'; });
   }
   thead.innerHTML = h1 + '</tr>' + h2 + '</tr>';
@@ -2763,7 +2884,7 @@ function renderResultsW(){
       // coloured by the same test as the design notes: the true equilibrium
       // occupancy at [L]max should reach 90%
       (function(){
-        var fEqTop = boundFrac(Math.max(0, num(g.L.pt, 0)), g.sim.hi, g.L.kd, hn(g.L)), good = fEqTop >= 0.9;
+        var fEqTop = boundFrac(ptOf(g.L), g.sim.hi, g.L.kd, hn(g.L)), good = fEqTop >= 0.9;
         return '<td class="' + (good ? 'ok' : 'warn') + '" title="' + (good ? 'Reaches the plateau' :
           'Too low: the titration stops short of the plateau (see the design notes)') + '">' + fmt(fTop, 3) + '</td>';
       })() +
@@ -2853,14 +2974,10 @@ function renderScenarios(){
   sel.addEventListener('change', function(){
     var sc = SCENARIOS.filter(function(x){ return x.key === sel.value; })[0];
     if (!sc) return;
-    var keepK = state.ligands.map(function(L){ return { kon:L.kon, koff:L.koff, kcalc:L.kcalc }; });
-    state.points = 14;          // the bench default; a scenario may set its own
-    state.coop = false;
+    // every scenario starts from the defaults - toggles, times, models, units
+    // and rate constants - and then sets only what it is about
+    resetState();
     sc.apply();
-    // scenarios set the equilibrium experiment; the rate constants carry over
-    // unless the scenario is about the kinetics itself
-    if (!(sc.sets && sc.sets.rates))
-      state.ligands.forEach(function(L, i){ L.kon = keepK[i].kon; L.koff = keepK[i].koff; L.kcalc = keepK[i].kcalc === 'kd' ? 'off' : keepK[i].kcalc; });
     state.preset = sc.key;
     reseed();
     renderAll();
@@ -2941,7 +3058,9 @@ function renderLigands(){
         ' aria-label="Include ' + esc(L.name) + '"><span></span></label></div>';
     var dil = state.lowMode === 'dilution';
     var body = '<div class="grid6 ' + (dil ? 'ld' : 'lm') + '">' +
-        fieldRow(i, 'pt', '[P]<sub>T</sub>', 'value="' + L.pt + '" min="0" step="any"') +
+        (surfOn()
+          ? fieldRow(i, 'pt', '[P]<sub>T</sub>', 'value="' + L.pt + '" min="0" step="any" disabled title="Not used: in a surface experiment the flowing ligand is never depleted"').replace('<div>', '<div class="pt-off">')
+          : fieldRow(i, 'pt', '[P]<sub>T</sub>', 'value="' + L.pt + '" min="0" step="any"')) +
         (dil
           ? fieldRow(i, 'dil', 'dilution', 'value="' + sigfig(dilOf(L), 4) +
               '" min="1.001" step="any"', lowDot(i, 'dil'))
@@ -3083,6 +3202,11 @@ function renderAll(){
   document.getElementById('kinOn').checked = state.kin;
   document.getElementById('kinTa').value = state.ta;
   document.getElementById('kinRow').classList.toggle('off', !state.kin);
+  document.getElementById('kinTimes').classList.toggle('off', !state.kin);
+  document.getElementById('kinMode').textContent = !state.kin ? '' : state.surf ? 'Surface-bound (SPR/BLI)' : 'In solution';
+  document.getElementById('surfOn').checked = state.surf;
+  var td = document.getElementById('kinTd');
+  td.value = state.td; td.disabled = !state.surf;
   document.getElementById('coopOn').checked = state.coop;
   document.getElementById('coopRow').classList.toggle('off', !state.coop);
   redraw();
@@ -3151,6 +3275,19 @@ document.getElementById('kinTa').addEventListener('input', function(){
   reseed(); redraw();
 });
 document.getElementById('kinTa').addEventListener('blur', function(){ this.value = state.ta; });
+document.getElementById('surfOn').addEventListener('change', function(){
+  state.surf = this.checked;
+  if (state.surf) state.tab = 'kin';
+  touched(); reseed();
+  renderAll();
+});
+document.getElementById('kinTd').addEventListener('input', function(){
+  var v = parseFloat(this.value);
+  if (!isFinite(v) || v <= 0) return;
+  state.td = v;
+  redraw();
+});
+document.getElementById('kinTd').addEventListener('blur', function(){ this.value = state.td; });
 document.getElementById('kinCopy').addEventListener('click', function(){
   if (!kinCache || !kinCache.length){ saidIn('kinSaid', 'no ligands switched on'); return; }
   copyText(kinTSV(), 'kinSaid');
@@ -3292,7 +3429,7 @@ document.addEventListener('click', function(ev){
   redraw();
 });
 
-// "Steady-state" in the results header opens the kinetics results below
+// "Steady-state" in the results header opens the Steady-State Results below
 document.addEventListener('click', function(ev){
   var a = ev.target.closest && ev.target.closest('a.tolink, a.cardlink');
   if (!a) return;
