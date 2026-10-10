@@ -2441,10 +2441,10 @@ function eqNotes(){
       return x.tag + ' has ' + x.mid + ' point' + (x.mid === 1 ? '' : 's') + ' between 10% and 90% bound'; }).join(', ') +
     '. Use a smaller dilution factor or more points so the slope is sampled.');
   var range = D.map(function(x){ return (many ? x.tag + ' runs ' : 'It runs from ') + pct(x.bot) + ' to ' + pct(x.top) + ' bound with ' + x.mid + ' points between 10% and 90%'; }).join('; ');
-  if (!notes.length) notes.push('<b>' + (many ? 'Every titration is' : 'The titration is') + ' well designed' + (state.kin ? ' at equilibrium' : '') + '.</b> ' +
-    range + (surfOn() ? ', and with no depletion on the surface the curve midpoint reports the K<sub>d</sub>.' : ', and [P]<sub>T</sub> is low enough that the curve midpoint reports the K<sub>d</sub>.'));
   // with kinetics on, the curve is only an equilibrium measurement if every
-  // point has got there by the read
+  // point has got there by the read; when they have not, that comes first and
+  // the design is judged as it would be at equilibrium
+  var notEq = null;
   if (state.kin){
     var kd = kinData(), ta = state.ta;
     var short = D.map(function(x){
@@ -2454,19 +2454,25 @@ function eqNotes(){
       K.pts.forEach(function(P){ var v = P.feq > 0 ? 100 * P.f(ta) / P.feq : 100; if (v < worst) worst = v; });
       return worst < 95 ? { x: x, worst: worst, slow: det.slow } : null;
     }).filter(Boolean);
-    if (short.length && surfOn()) notes.push('<b>The steady-state curve has not reached equilibrium.</b> ' + short.map(function(o){
+    if (short.length && surfOn()) notEq = '<b>The steady-state curve has not reached equilibrium.</b> ' + short.map(function(o){
         var f = o.x.g.fits[0];
         return o.x.tag + ' reaches only ' + Math.round(o.worst) + '% of equilibrium at its lowest points after ' + dur(ta) +
-          (f ? ', so a steady-state fit gives K<sub>d</sub> = ' + fmt(f.kHalf, 3) + ' ' + u + ' against the true ' + fmt(o.x.kd, 3) + ' ' + u : ''); }).join('. ') +
-      '. This matters only for steady-state affinity analysis; the kinetic fit takes K<sub>d</sub> from k<sub>off</sub>/k<sub>on</sub> and does not need equilibrium.');
-    else if (short.length) notes.push('<b>The curve is not at equilibrium when read.</b> ' + short.map(function(o){
+          (f ? ', so an equilibrium fit gives K<sub>d</sub> = ' + fmt(f.kHalf, 3) + ' ' + u + ' against the true ' + fmt(o.x.kd, 3) + ' ' + u : '') +
+          '; for an equilibrium fit, extend the association to at least ' + dur(o.slow); }).join('. ') +
+      '. The kinetic fit below does not need equilibrium: it takes K<sub>d</sub> from k<sub>off</sub>/k<sub>on</sub>.';
+    else if (short.length) notEq = '<b>The curve is not at equilibrium when read.</b> ' + short.map(function(o){
         var f = o.x.g.fits.filter(function(m){ return m.model === 'quadratic'; })[0] || o.x.g.fits[0];
         return o.x.tag + ' reaches only ' + Math.round(o.worst) + '% of equilibrium at its lowest points after ' + dur(ta) +
           (f ? ', so its fitted K<sub>d</sub> (' + fmt(f.kHalf, 3) + ' ' + u + ') ' +
             (f.kHalf > 1.2 * o.x.kd ? 'overstates' : 'only roughly matches') + ' the true ' + fmt(o.x.kd, 3) + ' ' + u : '') +
           '; incubate at least ' + dur(o.slow); }).join('. ') +
-      '. Under-bound low-concentration points push the apparent midpoint to higher [L], so the curve reports a weaker binder than the true one.');
+      '. Under-bound low-concentration points push the apparent midpoint to higher [L], so the curve reports a weaker binder than the true one.';
   }
+  var mid = surfOn() ? ', and with no depletion on the surface the curve midpoint reports the K<sub>d</sub>.' : ', and [P]<sub>T</sub> is low enough that the curve midpoint reports the K<sub>d</sub>.';
+  if (!notes.length) notes.push(notEq
+    ? '<b>' + (many ? 'Every titration would be' : 'The titration would be') + ' well designed at equilibrium.</b> ' + range + mid
+    : '<b>' + (many ? 'Every titration is' : 'The titration is') + ' well designed' + (state.kin ? ' at equilibrium' : '') + '.</b> ' + range + mid);
+  if (notEq) notes.unshift(notEq);
   return notes;
 }
 
@@ -2481,11 +2487,21 @@ function renderDesignNotes(){
   };
   var kd = surfOn() ? kinData() : [];
   var kn = kd.length ? kinNotes(kd) : [];
-  host.innerHTML = block('Equilibrium', eq) + (kn.length ? block('Kinetics · surface-bound', kn) : '');
+  host.innerHTML = surfOn()
+    ? block('Equilibrium fit (steady state)', eq) + (kn.length ? block('Kinetic fit (rate constants)', kn) : '')
+    : block('Equilibrium', eq);
   // the closed accordion still says whether anything needs attention
-  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|Not every point|Depletion shapes|Too little dissociation|Association is too short)/;
-  var n = eq.concat(kn).filter(function(t){ return problem.test(t); }).length;
-  document.getElementById('designSub').innerHTML = n
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Association is too short)/;
+  var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
+  var n = count(eq.concat(kn));
+  // surface-bound: the kinetics and the steady state are two separate fits,
+  // so each gets its own verdict
+  var verdict = function(label, k){
+    return '<span class="' + (k ? 'bad' : 'ok') + '">' + label + ': ' + (k ? k + (k === 1 ? ' issue' : ' issues') : 'OK') + '</span>';
+  };
+  if (surfOn()) document.getElementById('designSub').innerHTML =
+    verdict('Equilibrium fit', count(eq)) + ' · ' + verdict('Kinetic fit', count(kn));
+  else document.getElementById('designSub').innerHTML = n
     ? '<span class="bad">' + n + (n === 1 ? ' issue' : ' issues') + '</span> to review'
     : '<span class="ok">No issues</span> · the design looks sound';
 }
