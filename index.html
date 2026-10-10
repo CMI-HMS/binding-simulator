@@ -1,0 +1,3326 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Binding Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --plane:#EDF1F0;
+  --surface:#FBFCFC;
+  --surface-2:#F3F7F6;
+  --ink:#101615;
+  --ink-2:#4B5654;
+  --muted:#7C8785;
+  --line:#DBE2E0;
+  --line-2:#C5CECC;
+  --grid:#D3DBD9;
+  --axis:#7D8886;
+  --tick:#3F4A48;
+  --s1:#2a78d6;
+  --s2:#eb6834;
+  --s3:#1baf7a;
+  --field:#FFFFFF;
+  --on:#4C5856;
+  --ok:#2b7a3e; --bad:#9e150b; --assoc:rgba(90,85,95,.05); --ramp-l:44;
+  --shadow:0 1px 2px rgba(16,22,21,.05);
+  --sans:"Archivo",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --plane:#0B0F0E; --surface:#161B1A; --surface-2:#1C2221;
+    --ink:#F1F4F3; --ink-2:#A9B4B2; --muted:#7E8987;
+    --line:#272E2D; --line-2:#343C3B; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --field:#101514; --on:#C7D0CE; --shadow:0 1px 2px rgba(0,0,0,.35);
+    --ok:#6cc983; --bad:#f07b70; --assoc:rgba(200,195,210,.05); --ramp-l:66;
+  }
+}
+:root[data-theme="dark"]{
+  --plane:#0B0F0E; --surface:#161B1A; --surface-2:#1C2221;
+  --ink:#F1F4F3; --ink-2:#A9B4B2; --muted:#7E8987;
+  --line:#272E2D; --line-2:#343C3B; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --field:#101514; --on:#C7D0CE; --shadow:0 1px 2px rgba(0,0,0,.35);
+  --ok:#6cc983; --bad:#f07b70; --assoc:rgba(200,195,210,.05); --ramp-l:66;
+}
+
+*{box-sizing:border-box}
+body{background:var(--plane);color:var(--ink);font-family:var(--sans);
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{margin:0 auto;padding-inline:clamp(20px,2.2vw,44px);padding-block:10px 44px}
+
+/* header */
+/* Title and standfirst share one line. Every pixel spent here is a pixel the
+   plot does not get, and the plot is the point of the page. */
+h1{font-family:var(--sans);font-weight:700;font-size:clamp(18px,1.7vw,21px);
+  line-height:1.2;letter-spacing:-.018em;margin:0;flex:0 0 auto}
+.deck{margin:0;color:var(--ink-2);font-size:12.5px;line-height:1.4;flex:1 1 380px;min-width:0}
+.deck b{color:var(--ink);font-weight:600}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;
+  border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:7px}
+
+/* layout: compact settings across the top, the two curves side by side
+   filling the width, results beneath them - sized to the first screen */
+.layout{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow)}
+.top{display:grid;grid-template-columns:minmax(255px,280px) minmax(0,1fr);gap:12px;align-items:stretch}
+.params{padding:8px 9px 10px;min-width:0;display:flex;flex-direction:column}
+/* the three ligand cards share whatever height the panel is stretched to,
+   their rows spread evenly inside them */
+.params #ligands{flex:1 1 auto;gap:6px}
+.params .lig{flex:1 1 0;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:5px 6px 6px}
+.params .lig > .lig-head{margin-bottom:0}
+.params .lig > .kgrid{margin-top:0}
+/* switched off while measuring the panel's natural height */
+.top.measure,.top.measure .plots{align-items:start}
+.top.measure .plots > *{align-self:start}
+.top.measure .work > .plots{flex:0 0 auto}
+.top.measure .params #ligands,.top.measure .params .lig{flex:0 0 auto}
+/* settings column: experiment, models, kinetics, then the ligands */
+.ptop{display:flex;flex-direction:column;gap:7px;min-width:0;margin-bottom:8px}
+.pcol{min-width:0}
+/* shared parameters under the equilibrium curve, models to fit under the
+   kinetic curve: two boxes on the graphs' own columns */
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;
+  background:none;border:0;box-shadow:none;border-radius:0}
+.opts > .pcol{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  padding:8px 14px 10px}
+.opts .pexp .gridxp{grid-template-columns:.8fr .7fr .8fr 1.3fr}
+.opts .pexp .gridxp > div:last-child{grid-column:auto}
+@media (max-width:760px){ .opts{grid-template-columns:minmax(0,1fr)} }
+.params .pexp{margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.params .pexp .gridxp{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 5px}
+.params .pexp .gridxp > div:last-child{grid-column:auto}
+/* models to fit live at the foot of the equilibrium curve panel */
+/* models to fit: their own narrow panel to the right of the equilibrium curve,
+   each model's switches and RMSE stacked under its checkbox */
+.modpanel{padding:9px 12px 10px;min-width:0}
+.modpanel .sec{margin:0 0 6px}
+.modpanel .models{gap:10px}
+.modpanel .mslot{flex-direction:column;align-items:stretch;gap:5px}
+.modpanel .mslot + .mslot{padding-top:9px;border-top:1px solid var(--line)}
+.modpanel .mslot .rowpair{margin-left:22px;flex-wrap:wrap}
+.modpanel .mslot .rmse{padding-left:22px;gap:2px 9px;flex-wrap:nowrap;white-space:nowrap}
+.modsec{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.modsec .sec{margin:0!important}
+.modsec .bshared{margin:0 0 0 auto;padding:1px;border-radius:6px}
+.modsec .bshared button{font-size:9.5px;padding:1px 5px;line-height:1.3;border-radius:5px}
+.rp-empty{min-height:var(--rph,22px)}
+.modsec .rsd{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400;font-size:11px;color:var(--muted)}
+.modpanel .rmse .rsd{margin-left:auto}
+.main .legendrow{margin-bottom:4px}
+.params .kinrow{flex-wrap:wrap;align-items:center;gap:5px 8px;margin:8px 0 0}
+.params .kt{flex-basis:auto;margin-left:auto;justify-content:flex-end;gap:6px}
+.params .kt input{width:72px}
+.opts .mslot .chk{flex:0 0 auto;min-width:130px}
+.opts .sec{margin:0 0 3px}
+
+.params .sec{margin:0 0 3px}
+.pexp .gridxp{grid-template-columns:.9fr .8fr .8fr 1.2fr}
+.pexp .kinrow{flex-wrap:wrap;align-items:center;gap:5px 8px;margin:8px 0 0;padding-top:7px;border-top:1px solid var(--line)}
+.pexp .kt{flex-basis:auto;margin-left:auto;justify-content:flex-end;gap:6px}
+.pexp .kt input{width:72px}
+#kinRow{flex-wrap:nowrap}
+
+.pexp .gridxp{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 5px}
+.pexp .gridxp > div:last-child{grid-column:1 / -1}
+
+.scnrow{margin-left:auto;display:flex;align-items:flex-start;gap:8px}
+/* the label lines up with the menu, not with the menu plus its description */
+.scnrow > label{align-self:flex-start;display:flex;align-items:center;height:var(--scnH,25px)}
+.scnrow > label{margin:0;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.scnbox{display:flex;flex-direction:column;min-width:0}
+.scnrow select{font-weight:600;width:250px;max-width:100%}
+.scn-desc{margin:2px 0 0;font-size:11px;color:var(--ink-2);line-height:1.25;max-width:250px;text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ligands{display:flex;flex-direction:column;gap:5px;min-width:0}
+/* Hill n runs ~0.5-4, so its box is the narrow one */
+.params .grid6.lm,.params .grid6.ld{gap:1px 4px}
+.params .grid6.ld,.params .grid6.lm,.params .l3.ld,.params .l3.lm{grid-template-columns:.95fr .95fr 1.1fr 1.1fr}
+/* Kd spans the first two columns so [L]min, [L]max, kon and koff share one width */
+.params .l3 > div:first-child{grid-column:span 2}
+/* cooperativity adds its own line under the series */
+.params .hgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px 4px;padding-top:4px;border-top:1px dashed var(--line)}
+/* narrow column: the rates take two columns; t½ is in the results table */
+.params .l3{display:grid;gap:1px 4px;margin-top:0;padding-top:0;border-top:0}
+.params .kgrid > .derived{display:none}
+.params input[type=number],.params input[type=text]{font-size:11.5px}
+.params .lig input[type=number]{padding:2px 3px}
+/* card head on one line: name, copy, replicates, switch */
+.params .lig-head{gap:4px}
+.params .lig-head input[type=text]{flex:1 1 50px;min-width:54px;padding:1px 2px}
+.params .lig-head .cpy{padding:2px 4px;font-size:10px}
+.params .repfield{gap:3px}
+.params .repfield input[type=number]{width:38px}
+.params .repfield label{font-size:10px}
+
+.params .lig .dv{padding:3px 1px;font-size:11.5px}
+/* a ligand that is switched off folds to its name row */
+.work{min-width:0;display:flex;flex-direction:column;gap:10px}
+/* when the settings panel is taller than the plots can grow, the graph boxes
+   stretch so the models panel still ends level with it */
+.top > .work > .plots{flex:1 1 auto}
+.plots{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:stretch}
+/* the kinetic column is half the equilibrium column's width */
+.plots{grid-template-columns:minmax(0,1fr) 290px}
+.plots.two{grid-template-columns:minmax(0,1fr) 290px;grid-template-rows:auto 1fr auto}
+.plots > .main{grid-column:1;grid-row:1}
+.plots > .modpanel{grid-column:2;grid-row:1;align-self:start}
+.plots > .side{grid-column:1 / -1}
+/* kinetics on: the equilibrium curve spans two rows, the kinetic curve sits
+   under the models panel in the narrow column */
+.plots.two > .main{grid-row:1 / 3}
+.plots.two > .modpanel{align-self:start}
+.plots.two > .kinchart{grid-column:2;grid-row:2}
+/* one table under both curves: its equilibrium columns sit under the
+   equilibrium curve and its kinetics columns under the kinetic curve */
+.plots.two > .side{grid-column:1 / -1;grid-row:3}
+.side table.aligned{table-layout:fixed}
+@media (max-width:860px){
+  .plots,.plots.two{grid-template-columns:minmax(0,1fr);grid-template-rows:none}
+  .plots > *,.plots.two > .main,.plots.two > .modpanel,.plots.two > .kinchart,.plots.two > .side{grid-column:1;grid-row:auto}
+}
+.plots > .main,.plots > .kinchart{display:flex;flex-direction:column}
+.main{padding:8px 14px;min-width:0}
+.side{padding:7px 14px 8px;min-width:0}
+.side .results{margin-top:0;border-top:0;padding-top:0}
+.ph2{font-size:15.5px;font-weight:700;letter-spacing:-.014em;margin:0}
+@media (max-width:1000px){
+  .top{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .ptop{grid-template-columns:minmax(0,1fr)}
+  .pcol{padding:0;border-left:0!important}
+  .pcol + .pcol{border-top:1px solid var(--line);padding-top:6px}
+}
+
+.sec{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 3px}
+.sec.mt{margin-top:5px}
+
+/* scenario buttons - the selected one carries its own description. Every
+   button reserves the line, so selecting one never changes the rail's height. */
+#scenarios{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.scn{font:inherit;font-size:12px;font-weight:600;line-height:1.25;cursor:pointer;
+  text-align:left;color:var(--ink);background:var(--surface-2);
+  border:1px solid var(--line);border-radius:7px;padding:4px 8px;min-height:29px;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:1px}
+.scn-d{font-size:11px;font-weight:400;line-height:1.3;opacity:.85}
+.scn[aria-pressed="false"] .scn-d{visibility:hidden}
+.scn:hover{border-color:var(--ink-2)}
+.scn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.scn[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--surface)}
+
+/* form controls */
+label{display:block;font-size:11px;line-height:1.3;color:var(--ink-2);margin-bottom:1px}
+/* keep a subscripted label the same height as a plain one so the inputs line up */
+label sub,label sup{line-height:0;position:relative;vertical-align:baseline;font-size:75%}
+label sub{bottom:-.25em}label sup{top:-.5em}
+input[type=number],input[type=text],select{
+  width:100%;font:inherit;font-size:12.5px;background:var(--field);color:var(--ink);
+  border:1px solid var(--line-2);border-radius:6px;padding:3px 6px}
+input[type=number],.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+input:focus,select:focus{outline:2px solid var(--ink);outline-offset:-1px;border-color:var(--ink)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px 7px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 6px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px 5px}
+/* Six columns: five typed values plus the one derived from them. The
+   editable ones each need room for a six-character value such as 0.0001 or
+   100000 beside a stepper; the derived cell carries no stepper, so it is
+   given less. Which of [L]min and dilution is derived depends on the mode,
+   so the narrow column moves with it. Noise SD is shared by every ligand and
+   lives with the experimental parameters, not here. */
+/* Hill n holds three characters where the rest hold six, and a derived cell
+   carries no stepper, so neither takes a full share. */
+.grid6{display:grid;gap:1px 4px}
+/* grid items default to min-width:auto, which lets a long derived value widen
+   its own column at the expense of the fields; the track widths decide instead */
+.grid6>div{min-width:0}
+.grid6.lm{grid-template-columns:1fr 1fr .78fr 1fr .7fr 1fr}
+.grid6.ld{grid-template-columns:1fr 1fr .82fr .93fr 1fr 1fr}
+/* experimental parameters: unit, points, noise, then the two-button toggle */
+.gridxp{display:grid;grid-template-columns:.9fr .9fr .9fr 1.3fr;gap:4px 6px}
+/* the derived value: same box as a field so the row stays level, but read-only
+   and quieter, to read as a consequence of the others rather than an input */
+.lig .dv{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;
+  color:var(--ink-2);border:1px solid transparent;border-radius:6px;
+  padding:3px 4px;text-align:right;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.lig .derived label{color:var(--ink-2)}
+/* replicates rides on the name row */
+.repfield{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto}
+.repfield label{font-size:10.5px;margin:0;white-space:nowrap;color:var(--ink-2)}
+.repfield input[type=number]{width:44px;font-size:12px;padding:2px 5px;text-align:right}
+.lig label{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* seven fields abreast, so trim the chrome each one carries */
+.lig input[type=number]{font-size:12px;padding:2px 4px;text-align:right}
+/* The steppers stay, and stay visible: the column is sized to leave room for
+   them beside the widest value a field can hold, so nothing shifts when the
+   pointer arrives and the controls are discoverable without hovering. */
+.lig input[type=number]::-webkit-inner-spin-button{opacity:1}
+
+/* model checkboxes */
+.chk{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;color:var(--ink);
+  margin-bottom:3px;cursor:pointer}
+.chk input{width:15px;height:15px;margin:2px 0 0;accent-color:var(--on);flex:none;cursor:pointer}
+.chk .sub{display:block;font-size:10.5px;color:var(--muted);line-height:1.35}
+/* In the controls column each model is one line: its checkbox on the left,
+   its switches pushed to the right. An unchecked model keeps its place and
+   only dims, so the column does not jump as models are switched. */
+.models{display:flex;flex-direction:column;gap:4px;min-width:0}
+.mslot{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-width:0}
+.mslot .chk{margin-bottom:0;font-size:12px;flex:1 1 auto}
+.mslot .rowpair{display:flex;flex-wrap:wrap;gap:5px;margin-left:auto}
+.mslot .hillrow{margin:0;padding:1px}
+.mslot .hillrow button{font-size:10px;padding:2px 6px}
+.mslot.off{opacity:.5}
+.mslot .rmse{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px;
+  padding-left:22px;font-size:11.5px;color:var(--muted)}
+.mslot .rmse:empty{display:none}
+.rmse .rk{font-size:10.5px;font-weight:600;letter-spacing:.06em}
+.rmse .rv{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.rmse .rv .dot{width:8px;height:8px;border-radius:2px}
+.rmse .rsd{margin-left:auto;font-size:11px}
+.hillrow{display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:7px;padding:2px;width:max-content}
+.hillrow.wide{width:100%}
+.hillrow.wide button{flex:1 1 0;padding:3px 4px;text-align:center}
+.hillrow button{font:inherit;font-size:10.5px;color:var(--ink-2);background:none;border:0;
+  border-radius:5px;padding:3px 7px;cursor:pointer}
+.hillrow button[aria-pressed="true"]{background:var(--on);color:var(--surface)}
+.hillrow button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+
+/* ligand cards */
+.lig{border:1px solid var(--line);border-radius:9px;padding:2px 8px 4px;
+  background:var(--surface-2);min-width:0}
+/* An excluded ligand keeps its full card - same height, same fields, just
+   greyed - so the column does not jump as ligands are switched on and off. */
+.lig.off{opacity:.5}
+.params .lig.on{flex:0 0 auto}
+.lig.off .dot{filter:grayscale(1)}
+.lig-head{display:flex;align-items:center;gap:7px;margin-bottom:2px}
+.dot{width:10px;height:10px;border-radius:3px;flex:none}
+.lig-head input[type=text]{flex:1;min-width:0;border:0;background:none;padding:1px 3px;
+  font-weight:600;font-size:12.5px}
+.lig-head input[type=text]:focus{background:var(--field);outline:1px solid var(--line-2)}
+.sw{position:relative;display:inline-flex;align-items:center;flex:none}
+.sw input{position:absolute;opacity:0;width:34px;height:19px;margin:0;cursor:pointer}
+.sw span{width:32px;height:18px;border-radius:999px;background:var(--line-2);display:block;
+  position:relative;transition:background .12s}
+.sw span::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;
+  border-radius:50%;background:var(--surface);transition:transform .12s}
+.sw input:checked + span{background:var(--on)}
+.sw input:checked + span::after{transform:translateX(14px)}
+.sw input:focus-visible + span{outline:2px solid var(--ink);outline-offset:2px}
+.cpy{font:inherit;font-size:10.5px;color:var(--ink-2);background:var(--surface);flex:none;
+  border:1px solid var(--line-2);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap}
+.cpy:hover{border-color:var(--ink-2);color:var(--ink)}
+.cpy:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.hint{font-size:10.5px;color:var(--muted);line-height:1.4;margin:7px 0 0}
+
+/* chart */
+.chart-head{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-height:32px;
+  margin-bottom:4px;flex-wrap:wrap}
+.export{margin-right:auto;display:inline-flex;align-items:center;gap:7px}
+.chart-head .ph2{margin-right:4px}
+.export button{font:inherit;font-size:12px;color:var(--ink-2);background:var(--surface-2);
+  border:1px solid var(--line);border-radius:7px;padding:4px 10px;cursor:pointer}
+.export button:hover{border-color:var(--line-2);color:var(--ink)}
+.export button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.export .said{font-size:11.5px;color:var(--muted);opacity:0;transition:opacity .15s}
+.export .said.on{opacity:1}
+.scaletog{display:inline-flex;gap:2px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:7px;padding:2px}
+.scaletog button{font:inherit;font-size:12.5px;font-weight:500;color:var(--ink-2);background:none;
+  border:0;border-radius:5px;padding:3px 10px;cursor:pointer}
+.scaletog button[aria-pressed="true"]{background:var(--on);color:var(--surface)}
+.scaletog button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+/* centred, so the width the 2:1 cap gives back reads as margin either side */
+.plotbox{position:relative}
+svg.plot{display:block;width:100%;height:auto;margin-inline:auto}
+svg.plot:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:4px}
+/* hover readout: what every curve predicts at the concentration under the pointer */
+#hoverlayer{pointer-events:none}
+.hair{stroke:var(--axis);stroke-width:1;stroke-dasharray:4 4;opacity:.8}
+.hdot{fill:var(--surface);stroke-width:2.2}
+.tip{position:absolute;z-index:3;pointer-events:none;
+  background:color-mix(in srgb, var(--surface) 82%, transparent);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+  border:1px solid var(--line);border-radius:9px;padding:6px 9px 7px;
+  box-shadow:0 6px 20px rgba(0,0,0,.16);white-space:nowrap}
+.tip-x{font-family:var(--mono);font-size:12px;color:var(--ink-2);
+  padding-bottom:4px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+/* one grid for every row, so the keys, names and numbers line up as columns */
+.tip-rows{display:grid;grid-template-columns:auto auto auto;gap:3px 10px;align-items:center}
+.tip-k{width:16px;height:0;border-top:3px solid var(--muted);display:inline-block}
+.tip-k.dotted{border-top-style:dotted}
+.tip-n{font-size:12px;color:var(--ink-2)}
+/* the reader has the series and wants the number, so the number carries the ink */
+.tip-v{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);
+  text-align:right;font-variant-numeric:tabular-nums}
+.tip-none{font-size:12px;color:var(--muted)}
+/* Chart chrome reads as a hierarchy: faint grid, a structural axis line at
+   ~3.5:1, tick numbers as real text at ~9:1, and the axis title in full ink. */
+.gridline{stroke:var(--grid);stroke-width:1}
+.axisline{stroke:var(--axis);stroke-width:1.5;shape-rendering:crispEdges}
+.tick{fill:var(--tick);font-family:var(--mono);font-size:14.5px;font-weight:500}
+.alab{fill:var(--ink);font-family:var(--sans);font-size:15.5px;font-weight:600}
+.curve{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.curve.dotted{stroke-dasharray:1 5.5}
+.truecurve{fill:none;stroke-width:7;stroke-linecap:round;opacity:.16}
+.glyph.true{border-top-width:6px;opacity:.3}
+.ebar{stroke-width:1.6;stroke-linecap:round}
+.obs{stroke:var(--surface);stroke-width:1.6}
+.kd-line{stroke-width:1.2;stroke-dasharray:3 3;opacity:.72}
+.kd-line.dotted{stroke-dasharray:1 4}
+.mid-line{stroke-width:1.3;stroke-dasharray:8 4;opacity:.8}
+
+/* legend */
+/* An excluded ligand keeps its chip, unpainted, so the legend takes the same
+   number of lines whatever is switched on and the plot never resizes under it. */
+.legendrow{display:flex;flex-wrap:wrap;align-items:center;gap:5px 16px;margin-top:4px}
+.lgi.ph{visibility:hidden}
+.legend{display:flex;flex-wrap:wrap;gap:5px}
+.lgi{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line);border-radius:999px;
+  padding:2px 9px 2px 8px;font-family:inherit}
+.keyline{display:flex;flex-wrap:wrap;gap:13px;font-size:12px;color:var(--muted)}
+.keyline i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+.glyph{width:22px;height:0;border-top:3px solid var(--muted);display:inline-block}
+.glyph.dash{border-top-style:dotted;border-top-width:3px}
+.dotmark{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block}
+
+/* results */
+.results{margin-top:9px;border-top:1px solid var(--line);padding-top:8px}
+.tablescroll{overflow-x:auto}
+/* one row per ligand; each fitted model gets its own group of columns */
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:460px}
+th,td{text-align:right;padding:3.5px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+thead tr:first-child th:first-child,tbody td:first-child{text-align:left}
+thead th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;border-bottom:1px solid var(--line-2);white-space:normal;line-height:1.25;
+  vertical-align:bottom;padding-bottom:5px}
+/* Now that the checkboxes no longer sit over the columns, each model names its
+   own block of columns here. */
+thead .grpth{text-align:center;padding:0 9px 2px;border-bottom:0;font-size:11px;
+  letter-spacing:.05em;color:var(--ink-2)}
+tbody td{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+tbody td:first-child{font-family:var(--sans);font-weight:500}
+/* The table holds a row per ligand whether or not that ligand is switched on.
+   The unused ones are reserved but not painted, so the panel keeps its height
+   and the plot above it does not resize as ligands come and go. */
+/* the rule is kept but painted transparent, so a reserved row is exactly as
+   tall as a real one and still leaves no line behind */
+tbody tr.ph td,thead tr.ph th{visibility:hidden;border-color:transparent}
+tbody tr.end td,tbody tr.end th{border-bottom:0}
+th.gl,td.gl{border-left:1px solid var(--line)}
+.nm{display:inline-flex;align-items:center;gap:7px}
+.fixedtag{color:var(--muted);font-family:var(--sans);font-size:11.5px}
+.se{color:var(--muted);font-size:12px;white-space:nowrap}
+
+/* notes: a stack of full-width accordions. Prose keeps a readable measure;
+   the glossary and the about card use the width as columns instead. */
+.notes{margin-top:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;
+  box-shadow:var(--shadow)}
+.note .nbody > p{max-width:110ch}
+.terms{columns:2 440px;column-gap:44px}
+.terms li{break-inside:avoid}
+.split{display:grid;grid-template-columns:minmax(0,1fr);gap:12px 44px}
+@media (min-width:900px){ .split{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.terms li{margin-bottom:6px}
+.split h4{font-family:var(--sans);font-size:12.5px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 7px}
+@media (min-width:1500px){ .deck{max-width:118ch} }
+
+.note h3{font-family:var(--sans);font-size:15.5px;font-weight:700;margin:0;letter-spacing:-.014em}
+/* every explainer is an accordion: the title row opens it, closed by default */
+.notes{align-items:start}
+details.note{padding:0}
+/* same arrow as the other accordions: on the left, pointing right when closed */
+details.note > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:4px 14px;
+  padding:10px 14px;border-radius:12px}
+details.note > summary::-webkit-details-marker{display:none}
+details.note > summary::before{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--muted);
+  border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin-right:2px}
+details.note[open] > summary::before{transform:rotate(45deg)}
+details.note > summary:hover h3{color:var(--ink-2)}
+details.note > summary:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+details.note .nbody{padding:4px 16px 16px}
+.note p{margin:0 0 10px;color:var(--ink-2);font-size:13.5px}
+.note p:last-child{margin-bottom:0}
+.note ul{margin:0;padding-left:17px;color:var(--ink-2);font-size:13.5px}
+.note li{margin-bottom:6px}
+.note li:last-child{margin-bottom:0}
+/* Equations read as bold sentences in the running text, not as code blocks. */
+.eq{font-family:var(--sans);font-size:14.5px;font-weight:600;letter-spacing:-.005em;
+  color:var(--ink);margin:0 0 10px}
+.eq .cm{display:block;color:var(--muted);font-weight:500;font-size:12px;letter-spacing:.02em;margin-bottom:1px}
+.rad{border-top:1px solid currentColor;padding:0 2px}
+.note p.pull{font-family:var(--sans);font-size:14.5px;font-weight:600;letter-spacing:-.005em;
+  color:var(--ink);margin:0 0 10px}
+footer{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--muted)}
+footer p{margin:0}
+.credit{margin-top:10px;color:var(--ink-2);font-size:12.5px}
+.credit b{color:var(--ink);font-weight:600}
+footer a{color:inherit;text-decoration:underline;text-underline-offset:2px;
+  text-decoration-color:var(--line-2)}
+footer a:hover{color:var(--ink);text-decoration-color:var(--ink-2)}
+footer a:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
+/* ---- explore kinetics ---- */
+.kinrow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;margin:5px 0 3px}
+.kintog{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink);
+  margin:0;cursor:pointer}
+.kt{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.kt label{margin:0;white-space:nowrap}
+.kt input{width:86px}
+/* hidden, not removed, so switching kinetics on does not push the panel down */
+.kinrow.off .kt{visibility:hidden}
+#coopRow{border-top:0!important;padding-top:0!important;margin-top:6px!important}
+/* the Hill slope switch exists only while cooperativity is on */
+.stage:not(.coop) .modpanel .mslot .rowpair{display:none}
+.calcnote{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.calc-top{margin:0 0 6px;white-space:normal;line-height:1.3}
+.calc-top i{vertical-align:-1px;margin-right:4px}
+.params .lig .kl label{white-space:nowrap}
+/* narrow parameters column: labels a touch smaller so kon (M⁻¹s⁻¹) fits beside its dot */
+.params .lig label{font-size:10px}
+.params .lig .kl label{letter-spacing:-.01em}
+.params .lig .kl{gap:2px}
+.calcnote i{font-style:normal;display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:var(--on);margin-right:4px;vertical-align:0}
+/* the rate constants ride in their own row inside each ligand card */
+.kgrid{display:grid;grid-template-columns:1fr 1fr .8fr;gap:1px 6px;margin-top:3px;padding-top:3px;
+  border-top:1px dashed var(--line-2)}
+.kgrid>div{min-width:0}
+.kl{display:flex;align-items:center;gap:5px;min-width:0;margin-bottom:1px}
+.kl label{margin:0}
+.kgrid input[type=text]{font-family:var(--mono);font-size:12px;padding:2px 4px;text-align:right}
+.kgrid input.calc{background:transparent;border-style:dashed;color:var(--ink-2);cursor:default}
+.calcdot{flex:none;width:10px;height:10px;border-radius:50%;padding:0;border:1.5px solid var(--muted);
+  background:transparent;cursor:pointer;opacity:.6}
+.calcdot:hover{opacity:1}
+.calcdot[aria-pressed="true"]{background:var(--on);border-color:var(--on);opacity:1;cursor:default}
+.calcdot:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.kinwrap{display:flex;flex-direction:column;gap:14px;min-width:0}
+.kinchart{padding:10px 14px 10px;min-width:0}
+.kin-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:4px;min-height:32px}
+.kin-head h2{font-size:15.5px;font-weight:700;letter-spacing:-.014em;margin:0}
+.kin-head .export{margin-right:0;margin-left:auto}
+.kreadout{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.kplot{position:relative}
+.kplot svg{display:block;width:100%;height:auto;overflow:visible}
+.ktip .kr{display:grid;grid-template-columns:auto 4.4em 5.2em;column-gap:14px;align-items:center;
+  font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.ktip .kr>span:not(:first-child){text-align:right}
+.ktip .kr>span:first-child{display:flex;align-items:center;gap:6px}
+.ktip .kr.th{font-family:var(--sans);font-size:10.5px;font-weight:600;color:var(--muted);margin-bottom:2px}
+.ktip .kt0{font-family:var(--mono);font-size:12px;color:var(--ink-2);padding-bottom:4px;margin-bottom:4px;
+  border-bottom:1px solid var(--line)}
+.ktip .kta{font-size:11px;font-weight:600;color:var(--muted);margin-top:4px}
+.ksw{width:10px;height:3px;border-radius:2px;display:inline-block;flex:none}
+.kkey{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;margin-top:6px;font-size:12px;color:var(--muted)}
+.kkey .ramp{display:inline-flex;gap:1px;margin-right:6px;vertical-align:middle}
+.kkey .ramp i{width:7px;height:4px;display:inline-block;border-radius:1px}
+.kkey b{color:var(--ink-2);font-weight:600}
+
+.res-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.res-head h2{font-size:15.5px;font-weight:700;letter-spacing:-.014em;margin:0}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:14px;align-items:start}
+.rcard{padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0;border-top:4px solid var(--ac)}
+.rc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+.rc-head h3{margin:0;font-size:14px;font-weight:600}
+.rc-stats{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--muted)}
+.rc-stats b{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--ink);margin-left:3px}
+.rtab{min-width:0}
+.rtab th,.rtab td{padding:6px 6px}
+.rtab th.ca,.rtab td.ca{text-align:left}
+.rtab td.ca{font-family:var(--mono);font-weight:400}
+.rtab .sym{text-transform:none;letter-spacing:0;font-size:12px}
+.rtab td.ok,.side td.ok{color:var(--ok)}
+.rtab td.warn,.side td.warn{color:var(--bad);font-weight:600}
+.side .res-head{margin:3px 0 8px}
+.res-sub{font-size:12.5px;color:var(--muted);margin-left:-2px}
+.res-sub:empty{display:none}
+a.cardlink{color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:3px}
+a.cardlink:hover{text-decoration-color:currentColor}
+.nbody .msub{margin:14px 0 4px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.nbody .msub:first-child{margin-top:0}
+.mcols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 36px;align-items:start}
+@media (max-width:900px){ .mcols{grid-template-columns:minmax(0,1fr)} .mcols > section + section{margin-top:14px} }
+a.tolink::after{content:" ↓"}
+a.tolink{color:inherit;text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:3px}
+a.tolink:hover{color:var(--ink);text-decoration-color:currentColor}
+.side .res-head > .export{margin-left:auto;margin-right:0;position:relative}
+.side .res-head .said{position:absolute;right:0;top:100%;white-space:nowrap}
+/* transposed summary */
+.side{padding:7px 12px 8px}
+.side thead th.lc{text-transform:none;letter-spacing:0;font-size:12px;color:var(--ink);text-align:right;max-width:90px}
+.side thead th.lc .nm{justify-content:flex-end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.side tbody th.rl{text-align:left;font-weight:500;font-size:12.5px;color:var(--ink-2);text-transform:none;
+  letter-spacing:0;white-space:nowrap;padding-left:2px}
+.side tbody td{white-space:nowrap}
+.side tr.sec-row th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);padding:12px 2px 4px;border-bottom:1px solid var(--line-2)}
+.side tbody tr:first-child.sec-row th{padding-top:6px}
+.side td.msg{color:var(--muted);font-family:var(--sans);text-align:left;white-space:normal}
+/* kinetic curves: one accordion below the plots, ligands side by side */
+details.kone > summary{list-style:none;cursor:pointer;display:flex;align-items:center;flex-wrap:wrap;
+  gap:4px 14px;padding:10px 14px}
+details.kone > summary::-webkit-details-marker{display:none}
+details.kone > summary::before{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--muted);
+  border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin-right:2px}
+details.kone[open] > summary::before{transform:rotate(45deg)}
+details.kone > summary:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;border-radius:12px}
+.kcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px;
+  padding:4px 14px 14px;border-top:1px solid var(--line)}
+.kcol{min-width:0;border-top:3px solid var(--ac);padding-top:8px}
+.kcol-h{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 12px;margin:0 0 4px;font-size:13px;font-weight:600}
+.kcol .rtab{min-width:0}
+.kcol .rtab th,.kcol .rtab td{padding:3px 6px}
+.rc-notes .lgn{display:inline-flex;align-items:baseline;gap:4px;font-weight:600;white-space:nowrap}
+.rc-notes .lgn .dot{width:8px;height:8px;border-radius:2px;align-self:center}
+.dpanel{padding:0}
+.dpanel .ph2{margin:0}
+.dpanel > .dcols{padding:0 16px 14px}
+.dsum{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.dsum .ok{color:var(--ok);font-weight:600}
+.dsum .bad{color:var(--bad);font-weight:600}
+.dcols{display:flex;flex-direction:column;gap:10px}
+.dcols .dcol{border-top:1px solid var(--line);padding-top:8px;font-size:13px}
+.kcol .rc-notes{border-top:1px solid var(--line);padding-top:8px;margin-top:6px;font-size:12.5px}
+/* kinetic curve accordions under the summary table */
+.kaccs{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.kacc-h{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 2px}
+details.kacc{border:1px solid var(--line);border-left:3px solid var(--ac);border-radius:9px;background:var(--surface-2)}
+details.kacc > summary{list-style:none;cursor:pointer;display:flex;align-items:center;flex-wrap:wrap;
+  gap:4px 14px;padding:7px 12px}
+details.kacc > summary::-webkit-details-marker{display:none}
+details.kacc > summary::before{content:"";flex:none;width:7px;height:7px;border-right:2px solid var(--muted);
+  border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin-right:2px}
+details.kacc[open] > summary::before{transform:rotate(45deg)}
+details.kacc > summary:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;border-radius:9px}
+.kacc .nm{font-weight:600;font-size:13px}
+.kacc-sub{font-size:12px;color:var(--muted)}
+.kacc-x{margin:0 0 0 auto}
+details.kacc .kdetail{border-left:0;margin:0;padding:2px 12px 12px;background:var(--surface);
+  border-top:1px solid var(--line);border-radius:0 0 9px 0}
+/* the detail row: one ligand's concentration table beside its design notes */
+tr.kdet > td{text-align:left;white-space:normal;padding:4px 0 14px;font-family:var(--sans)}
+.kdetail{display:grid;grid-template-columns:minmax(0,1fr);gap:6px 24px;
+  align-items:start;border-left:3px solid var(--ac);padding:4px 0 2px 14px;margin-left:4px}
+.kdetail .rc-notes{border-top:0;padding-top:4px}
+.kdetail .rtab{min-width:0}
+.kdetail .rtab th,.kdetail .rtab td{padding:3px 8px}
+.kdetail .rtab td{border-bottom-color:var(--line)}
+thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
+@media (max-width:900px){ .kdetail{grid-template-columns:minmax(0,1fr)} }
+.rc-notes{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:10px;
+  color:var(--ink-2);font-size:13px}
+.rc-notes h4{margin:0 0 2px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rc-notes p{margin:0}
+.rc-notes b{color:var(--ink);font-weight:600}
+@media (max-width:520px){ .rcard{padding:12px 10px} .rtab th,.rtab td{padding:5px 3px} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ===== layout v2: three columns - parameters | curves | (models, results) ===== */
+.stage{display:grid;grid-template-columns:290px minmax(0,1fr);gap:12px;align-items:stretch}
+/* the notes column never sets the row height: it fills it and scrolls */
+.accs{display:flex;flex-direction:column;gap:12px;min-width:0}
+.accs > .notes{gap:12px}
+.stage.notes-beside{grid-template-columns:290px minmax(0,1fr) 290px}
+/* the accordion column fills the row and scrolls, so opening one never
+   stretches the curves and parameters beside it */
+.stage.notes-beside > .colR{position:relative;align-self:stretch;min-height:0}
+.stage.notes-beside > .colR > .accs{position:absolute;inset:0;overflow:auto;padding-bottom:2px}
+#accsR:empty{display:none}
+.stage.notes-beside .accs .dcols .dcol{font-size:12.5px}
+.stage.notes-beside .accs .mcols{grid-template-columns:minmax(0,1fr)}
+.stage.notes-beside .accs .mcols > section + section{margin-top:14px}
+.stage.notes-beside .accs .terms{columns:1}
+.stage.notes-beside .accs .split{grid-template-columns:minmax(0,1fr)}
+.stage.notes-beside .accs .kcols{grid-template-columns:minmax(0,1fr)}
+.stage.notes-beside .accs details.note > summary,.stage.notes-beside .accs details.kone > summary{padding:10px 14px}
+.stage.notes-beside .accs .note .nbody{padding:0 14px 14px}
+.stage.lay-B,.stage.lay-C{grid-template-columns:290px minmax(0,1fr) 330px}
+.colL,.colM,.colR{display:flex;flex-direction:column;gap:12px;min-width:0}
+.colL > .params{flex:1 1 auto}
+.colL > .modpanel{flex:0 0 auto}
+.colL > .modpanel .models{display:grid;grid-template-columns:auto auto auto auto;justify-content:space-between;gap:5px 6px}
+.colL > .modpanel .mslot{grid-row:1}
+.colL > .modpanel .mslot:nth-child(1){grid-column:1 / span 2}
+.colL > .modpanel .mslot:nth-child(2){grid-column:3 / span 2}
+.colL > .modpanel .nfit{grid-column:1;grid-row:2;padding-left:0}
+.colL > .modpanel .bfs{grid-column:2;grid-row:2}
+.colL > .modpanel .ptfit{grid-column:3;grid-row:2;padding-left:0}
+.colL > .modpanel .bfq{grid-column:4;grid-row:2}
+.colL > .modpanel .nfit,.colL > .modpanel .bfit,.colL > .modpanel .ptfit{font-size:11px;white-space:nowrap}
+.colL > .modpanel .bfit.off{opacity:.45}
+/* fit [P]T belongs to the quadratic model: under it, second row */
+.colL > .modpanel .ptfit.off,.colL > .modpanel .nfit.off{opacity:.45}
+.colL > .modpanel .chk{font-size:11.5px;gap:5px}
+.colL > .modpanel .modsec{margin-bottom:6px}
+.colL > .modpanel .mslot + .mslot{padding-top:0;border-top:0}
+.colL > .modpanel .mslot .chk{white-space:nowrap}
+.colL > .modpanel .mslot{flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:nowrap}
+.colL > .modpanel .mslot .rowpair{margin-left:auto}
+.colL > .modpanel .mslot .hillrow{padding:1px;border-radius:6px}
+/* the n and Bmax switches share one width, so their edges line up */
+.colL > .modpanel .mslot .hillrow,.colL > .modpanel .modsec .bshared{width:120px;display:flex}
+.colL > .modpanel .mslot .hillrow button,.colL > .modpanel .modsec .bshared button{flex:1 1 auto;text-align:center;white-space:nowrap}
+.colL > .modpanel .mslot .hillrow button,.modsec .bshared button{height:17px;line-height:15px;padding-top:0!important;padding-bottom:0!important;vertical-align:middle}
+.colL > .modpanel .mslot .hillrow button{font-size:9.5px;padding:1px 5px;line-height:1.3;border-radius:5px}
+.modpanel .rp-empty{display:none}
+.colR[hidden]{display:none}
+.mrow{display:flex;gap:12px;align-items:stretch;min-width:0;flex:1 1 auto}
+.mrow > .gstack{flex:1 1 auto;min-width:0}
+.mrow > .modpanel{flex:0 0 280px;align-self:stretch}
+.colR > .modpanel{flex:0 0 auto}
+/* models to fit at the foot of the equilibrium panel, the two side by side */
+.main > .modpanel{background:none;border:0;box-shadow:none;border-radius:0;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--line)}
+.main > .modpanel .models{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 24px}
+.main > .modpanel .mslot + .mslot{padding-top:0;border-top:0}
+.main > .modpanel .mslot{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.main > .modpanel .mslot .rowpair{margin-left:22px;flex-wrap:wrap}
+.main > .modpanel .mslot .rmse{flex-basis:auto;padding-left:22px;width:auto}
+.main > .modpanel .sec{margin-bottom:4px}
+.colR > .side{flex:1 1 auto}
+.colM > .side{flex:0 0 auto}
+.lay-B .mrow,.lay-C .mrow{flex:1 1 auto}
+.gstack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.gstack > .main,.gstack > .kinchart{display:flex;flex-direction:column;flex:1 1 auto;min-width:0}
+.gstack > .kinchart{padding:8px 14px}
+.lay-C .gstack > .main{flex:0 0 auto}
+.lay-C .gstack > .kinchart{flex:1 1 auto}
+.stage .plotbox{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+.stage .kplot{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+/* tabs: both curves share one cell; the hidden one keeps its size */
+.stage.tabbed .gstack{display:grid}
+.stage.tabbed .gstack > *{grid-area:1 / 1}
+.stage.tabbed[data-tab=eq] .gstack > .kinchart,
+.stage.tabbed[data-tab=kin] .gstack > .main{visibility:hidden;pointer-events:none}
+.gtabs{display:none;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:2px}
+.gtabs button{border:0;background:none;font-size:15px;font-weight:600;padding:6px 20px;border-radius:7px;color:var(--muted);box-shadow:none}
+.gtabs button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.stage.tabbed .gtabs{display:flex}
+.stage.tabbed .gt-h{display:none}
+/* the transposed table in the narrow right column */
+.colR .side table{width:100%;min-width:0}
+.colR .side tbody th.rl{white-space:nowrap}
+.colR .side td{text-align:right;font-size:12px;padding:3.5px 0 3.5px 6px}
+.colR .side th{padding-left:0;padding-right:0}
+.colR .side thead th.lc{padding-left:6px;max-width:none}
+.colR .side tbody th.rl{font-size:12px;padding-right:4px}
+.colR .side .se{font-size:10.5px}
+.colM .side table.tight th,.colM .side table.tight td{padding-left:4px;padding-right:4px}
+.colM .side table.tight td{font-size:12px}
+.colM .side thead th{font-size:10.5px;letter-spacing:.03em}
+.colM .side thead tr + tr th{height:30px;vertical-align:bottom}
+.colM .side table.tight .se{display:block;font-size:10px;line-height:1.1}
+.colR .side th.rl .se{display:block;font-size:10px;line-height:1.1;font-weight:400}
+.colR .side table.many .se{font-size:10px;display:block;line-height:1.1;margin-top:-1px}
+.colR .side thead th.lc .nm{max-width:70px;margin-left:auto}
+.colR .side .tablescroll{overflow-x:auto}
+/* measuring: everything at its natural size, the kinetic plot left out */
+.stage.measure,.stage.measure .mrow{align-items:start}
+.stage.measure .colL > .params,.stage.measure .mrow,.stage.measure .gstack > *,.stage.measure .colR > .side,
+.stage.measure .params #ligands,.stage.measure .params .lig{flex:0 0 auto}
+.stage.measure .mrow > .modpanel{align-self:start}
+.stage.measure .kplot{display:none}
+.stage.measure .gstack > *{align-self:start}
+/* layout picker (preview only) */
+@media (max-width:1000px){
+  .stage,.stage.lay-B,.stage.lay-C{grid-template-columns:minmax(0,1fr)}
+  .mrow{flex-wrap:wrap}
+  .mrow > .modpanel{flex:1 1 100%}
+}
+
+/* curve headers: x-scale on the left, title or tabs centred, export on the right */
+.stage .chart-head,.stage .kin-head{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;gap:10px;margin-bottom:4px;min-height:36px}
+.stage .chart-head > .export.exl{grid-column:1;grid-row:1;justify-self:start;margin:0}
+.legendrow > .scalerow{margin:0 0 0 auto;align-self:flex-end;flex:none}
+.legendrow > .scalerow button{white-space:nowrap}
+.legendrow{flex-wrap:nowrap!important;align-items:flex-end!important}
+.legendrow > .keyline{flex:1 1 auto;min-width:0}
+/* legends under the curves: ligands on one line, symbols on the next */
+.undercol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.underleg{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px}
+.underleg .lgi{display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:0;border-radius:0}
+.underleg .lgi .dot{width:10px;height:10px;border-radius:50%}
+.kkey.underleg{margin-top:6px;font-size:12px;color:var(--muted)}
+.kkey.underleg .kk{display:inline-flex;align-items:center;gap:6px}
+.kkey.underleg .ramp{margin:0}
+.scalerow .scaletog button{font-size:12px;padding:2px 10px}
+.stage .chart-head > .gt-h,.stage .kin-head > .gt-h,.stage .gtabs{grid-column:2;grid-row:1;justify-self:center;margin:0}
+.stage .chart-head > .export,.stage .kin-head > .export{grid-column:3;grid-row:1;justify-self:end;margin:0;position:relative}
+.stage .export .said{position:absolute;right:0;top:100%;margin-top:2px;white-space:nowrap}
+.stage .chart-head > .export{white-space:nowrap}
+@media (max-width:1380px){ .gtabs .tw{display:none} }
+
+/* ligand legends beside the curves, so the plots run less wide */
+.stage .plotrow{display:flex;align-items:center;justify-content:center;gap:16px;flex:1 1 auto;min-width:0;min-height:0}
+.stage .plotrow > .plotbox,.stage .plotrow > .kplot{flex:0 1 auto;min-width:0;align-self:stretch}
+/* a spacer as wide as the legend on the left, so the plot itself sits centred;
+   it gives way first when the panel is narrow */
+
+.stage{--sidew:172px}
+.sideleg{flex:0 0 var(--sidew);display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:6px;margin:0}
+.sideleg .lgi{display:flex;flex-direction:row;align-items:center;gap:7px;background:none;border:0;border-radius:0;padding:0;min-width:0}
+.sideleg .lgi .dot{width:10px;height:10px;border-radius:50%}
+.legend.sideleg{gap:7px}
+/* beside the equilibrium curve: models to fit above the ligand legend */
+.sidecol{flex:0 0 var(--sidew);width:var(--sidew);display:flex;flex-direction:column;justify-content:center;gap:16px;align-self:stretch;min-width:0}
+.sidecol > .legend.sideleg{flex:none}
+.sidecol > .modpanel + .legend{border-top:1px solid var(--line);padding-top:12px}
+.sidecol{gap:12px}
+.sidekey{flex-direction:column;flex-wrap:nowrap;gap:5px;font-size:11.5px;border-top:1px solid var(--line);padding-top:10px}
+.sidekey i{align-items:flex-start;line-height:1.3}
+.sidekey .glyph{flex:none;margin-top:6px}
+.sidecol > .modpanel .bfit{margin-top:2px}
+.kkey.sideleg{align-self:center}
+.sidecol > .modpanel{background:none;border:0;box-shadow:none;border-radius:0;padding:0}
+.sidecol > .modpanel .modsec{flex-direction:column;align-items:flex-start;gap:5px;margin-bottom:8px}
+.sidecol > .modpanel .modsec .bshared{margin:0}
+.sidecol > .modpanel .models{display:flex;flex-direction:column;gap:7px}
+.sidecol > .modpanel .mslot{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.sidecol > .modpanel .mslot .chk{white-space:nowrap}
+.sidecol > .modpanel .mslot .rowpair{margin-left:22px}
+.sidecol > .modpanel .hillrow,.sidecol > .modpanel .modsec .bshared{width:120px;display:flex}
+.sidecol > .modpanel .hillrow button,.sidecol > .modpanel .bshared button{flex:1 1 auto;text-align:center;white-space:nowrap;font-size:9.5px;padding:0 5px;height:17px;line-height:15px;border-radius:5px}
+.sidecol > .modpanel .rp-empty{display:none}
+.knote-row{font-size:12px;color:var(--muted);margin-top:4px;text-align:center}
+.kkey.sideleg{font-size:12px;gap:8px}
+.kkey.sideleg .kk{display:flex;flex-direction:row;align-items:center;gap:6px}
+.kkey.sideleg .ramp{margin:0}
+.kkey.sideleg .knote{font-size:11px;line-height:1.3}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Binding Simulator</h1>
+    <p class="deck">Choose a scenario or build your own binding simulation.</p>
+    <div class="scnrow">
+      <label for="scnSel">Scenario</label>
+      <div class="scnbox">
+        <select id="scnSel"></select>
+        <p class="scn-desc" id="scnDesc"></p>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="stage" id="stage">
+    <div class="colL">
+    <section class="panel params" aria-label="Experimental parameters">
+        <div class="pcol pexp">
+      <p class="sec">Experimental parameters</p>
+      <div class="gridxp">
+        <div>
+          <label for="unit" title="Concentration unit">Units</label>
+          <select id="unit"><option>pM</option><option selected>nM</option><option>µM</option><option>mM</option></select>
+        </div>
+        <div>
+          <label for="npts" title="Points per curve">Points</label>
+          <input type="number" id="npts" min="4" max="60" step="1" value="14">
+        </div>
+        <div>
+          <label for="noisesd" title="Standard deviation of the Gaussian error added to every replicate of every ligand, in fraction bound">Noise SD</label>
+          <input type="number" id="noisesd" min="0" step="0.01" value="0.02">
+        </div>
+      </div>
+
+
+      <div class="kinrow off" id="kinRow">
+        <label class="kintog"><span class="sw"><input type="checkbox" id="kinOn"><span></span></span>Add Kinetics</label>
+        <div class="kt">
+          <label for="kinTa" title="Association time: how long protein and ligand are incubated before the plate is read">Time (s)</label>
+          <input type="number" id="kinTa" min="1" step="any" value="600">
+        </div>
+      </div>
+      <div class="kinrow off" id="coopRow">
+        <label class="kintog"><span class="sw"><input type="checkbox" id="coopOn"><span></span></span>Add Cooperativity</label>
+      </div>
+        </div>
+      <p class="calcnote calc-top" id="calcNote"><i></i>= calculated · click ○ to calculate that value instead</p>
+      <div id="ligands"></div>
+    </section>
+    </div>
+    <div class="colM" id="colM">
+      <div class="mrow" id="mrow">
+      <div class="gstack" id="gstack">
+      <section class="panel main">
+      <div class="chart-head">
+        <div class="export exl">
+          <button id="resim" title="Draw a fresh set of noise for every ligand, leaving all the settings as they are">Resimulate</button>
+        </div>
+        <h2 class="ph2 gt-h">Equilibrium curve</h2>
+        <div class="gtabs" role="group" aria-label="Which curve to show"><button type="button" data-tab="eq">Equilibrium<span class="tw"> curve</span></button><button type="button" data-tab="kin">Kinetic<span class="tw"> curve</span></button></div>
+        <div class="export">
+          <button id="csvCopy" title="Copy the simulated points to the clipboard, ready to paste into a spreadsheet">Copy data</button>
+          <span class="said" id="csvSaid" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+
+      <div class="plotrow">
+      <div class="plotbox">
+        <svg class="plot" id="plot" viewBox="0 0 860 380" tabindex="0"
+             role="img" aria-label="Simulated binding data with fitted curves. Hover the plot, or focus it and use the arrow keys, to read what every fitted curve predicts at one concentration."></svg>
+        <div class="tip" id="tip" role="status" aria-live="polite" hidden></div>
+      </div>
+      </div>
+
+      <div class="legendrow">
+        <div class="undercol" id="eqSide">
+          <div class="legend underleg" id="legend"></div>
+          <div class="keyline" id="keyline"></div>
+        </div>
+        <div class="scalerow">
+        <div class="scaletog" role="group" aria-label="X axis scale">
+          <button id="scaleLog" aria-pressed="true">Log x</button>
+          <button id="scaleLin" aria-pressed="false">Linear x</button>
+        </div>
+        </div>
+      </div>
+      </section>
+      <section class="panel kinchart" id="kinChart" aria-labelledby="kinH" hidden>
+      <div class="kin-head">
+        <h2 id="kinH" class="gt-h">Kinetic curve</h2>
+        <div class="gtabs" role="group" aria-label="Which curve to show"><button type="button" data-tab="eq">Equilibrium<span class="tw"> curve</span></button><button type="button" data-tab="kin">Kinetic<span class="tw"> curve</span></button></div>
+        <div class="export">
+          <button id="kinCopy" title="Copy the association curves to the clipboard, ready to paste into a spreadsheet">Copy data</button>
+          <span class="said" id="kinSaid" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="plotrow">
+        <div class="kplot" id="kplot"></div>
+      </div>
+      <div class="kkey underleg" id="kkey"></div>
+      </section>
+      </div>
+      <section class="panel modpanel pmod">
+      <div class="modsec"><p class="sec">Models to fit</p>
+        </div>
+      <div class="models" id="modelsRow">
+        <div class="mslot">
+          <label class="chk">
+            <input type="checkbox" id="mSpecific">
+            <span id="mSpecificName">Specific binding</span>
+          </label>
+        </div>
+        <div class="mslot">
+          <label class="chk">
+            <input type="checkbox" id="mQuadratic">
+            <span>Quadratic 1:1</span>
+          </label>
+        </div>
+        <label class="chk nfit" title="Fit the Hill coefficient n in the specific binding model (it becomes the Hill model) instead of fixing n = 1">
+          <input type="checkbox" id="nFit">
+          <span>Fit <em>n</em></span>
+        </label>
+        <label class="chk ptfit" title="Fit the protein concentration in the quadratic model instead of fixing it at the [P]T entered">
+          <input type="checkbox" id="ptFit">
+          <span>Fit [P]<sub>T</sub></span>
+        </label>
+        <label class="chk bfit bfs" title="Fit the plateau in the specific binding model instead of fixing it at 1">
+          <input type="checkbox" id="bmaxSpecFit">
+          <span>Fit B<sub>max</sub></span>
+        </label>
+        <label class="chk bfit bfq" title="Fit the plateau in the quadratic model instead of fixing it at 1">
+          <input type="checkbox" id="bmaxQuadFit">
+          <span>Fit B<sub>max</sub></span>
+        </label>
+      </div>
+      </section>
+      </div>
+      <section class="panel side">
+        <div class="res-head" id="resTop">
+          <h2>Results</h2><span class="res-sub" id="resSub"></span>
+          <div class="export">
+            <button id="kinCopyRes" title="Copy the summary table above, ready to paste into a spreadsheet">Copy results table</button>
+            <span class="said" id="kinResSaid" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="results">
+          <div class="tablescroll">
+            <table>
+              <thead id="thead"></thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="colR" id="colR"><div class="accs" id="accsR"></div></div>
+    </div>
+
+
+  <div class="accs" id="accs">
+      <details class="panel kone dpanel" id="designPanel">
+        <summary>
+          <h2 class="ph2" id="designH">Experiment design notes</h2>
+          <span class="dsum" id="designSub"></span>
+        </summary>
+        <div class="dcols" id="designNotes"></div>
+      </details>
+
+      <details class="panel kone" id="kinAcc" hidden>
+        <summary>
+          <h2 class="ph2">Kinetics results</h2>
+          <span class="kacc-sub" id="kinAccSub"></span>
+          <span class="export kacc-x"><button type="button" id="kinAccCopy">Copy table</button>
+            <span class="said" id="kinAccSaid" role="status" aria-live="polite"></span></span>
+        </summary>
+        <div class="kcols" id="kinCols"></div>
+      </details>
+
+  <div class="notes">
+    <details class="note wide" id="aboutCard" open>
+      <summary><h3>About this simulation</h3></summary>
+      <div class="nbody">
+      <div class="split">
+        <div>
+          <h4>How it works</h4>
+          <p>Each binding dataset is simulated from exact mass balance, using the true ligand K<sub>d</sub> (and Hill coefficient, with Add Cooperativity on). Gaussian error is added to every replicate each time you change the experiment, the way a repeat experiment would. The selected models are then fitted to those points by least squares.</p>
+<p>With Add Kinetics on, each ligand also gets rate constants, k<sub>on</sub> and k<sub>off</sub>. The association of protein and ligand is then calculated for each concentration, including depletion of both partners. Each well is read at the end of the shared association time instead of at equilibrium. A short incubation will produce pre-steady-state results and under report binding at equilibrium. The results table adds, for each ligand, the time every concentration takes to reach 95% of equilibrium.</p>
+          <p>The equations are in <a class="cardlink" href="#modelsCard">The models</a>, and every symbol and column is defined in <a class="cardlink" href="#termsCard">Key terms</a>.</p>
+        </div>
+        <div>
+          <h4>What it assumes</h4>
+          <ul>
+            <li><b>Equilibrium</b>, or with Add Kinetics a read at the end of the association time, from exact one-step 1:1 binding with instant mixing.</li>
+            <li><b>One kind of site</b>, binding 1:1 unless Add Cooperativity sets a Hill coefficient (equilibrium only).</li>
+            <li><b>Full saturation at 1.</b> Fit B<sub>max</sub> to treat the plateau as unknown.</li>
+            <li><b>Constant Gaussian noise</b> with one SD and no outliers, so points can fall below 0 or above 1.</li>
+            <li><b>Known, fully active [P]<sub>T</sub></b>, unless you fit it in the quadratic model.</li>
+            <li><b>One unit throughout.</b> k<sub>on</sub> is per molar, so with kinetics the unit sets the time scale.</li>
+          </ul>
+        </div>
+      </div>
+      </div>
+    </details>
+    <details class="note" id="modelsCard">
+      <summary><h3>The models</h3></summary>
+      <div class="nbody mcols">
+      <section>
+      <h4 class="msub">Equilibrium</h4>
+      <p>Each describes one ligand binding one kind of site and gives the fraction bound as f = B<sub>max</sub>·θ, where θ is the occupancy the model predicts and B<sub>max</sub> is the plateau the signal reaches at saturation.</p>
+      <p class="eq"><span class="cm">specific binding</span>f = B<sub>max</sub> L<sub>T</sub> ⁄ ( K<sub>d</sub> + L<sub>T</sub> )</p>
+      <p class="eq"><span class="cm">Hill model (Fit n)</span>f = B<sub>max</sub> L<sub>T</sub><sup>n</sup> ⁄ ( K + L<sub>T</sub><sup>n</sup> ), &nbsp;K<sub>d</sub> = K<sup>1/n</sup></p>
+      <p class="eq"><span class="cm">quadratic 1:1</span>f = B<sub>max</sub> [ (P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>) − <span class="rad">√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>)</span> ] ⁄ 2P<sub>T</sub></p>
+      <p>Specific binding and the Hill model assume free ligand equals what you pipetted in; the Hill model adds a slope n for cooperativity, and its K<sub>d</sub> is the half-saturating concentration. The quadratic solves mass balance for both partners, so it needs [P]<sub>T</sub> and is strictly 1:1 — there is no Hill exponent to fit.</p>
+      </section>
+      <section>
+      <h4 class="msub">Kinetics</h4>
+      <p>Add Kinetics follows the same 1:1 binding through time. Protein and ligand are mixed at t = 0 and bind in a single step; both are drawn down as complex forms, so the solution is exact at any concentration.</p>
+      <p class="eq"><span class="cm">reaction</span>P + L ⇌ PL, &nbsp;K<sub>d</sub> = k<sub>off</sub> ⁄ k<sub>on</sub></p>
+      <p class="eq"><span class="cm">rate</span>d[PL]/dt = k<sub>on</sub>[P][L] − k<sub>off</sub>[PL]</p>
+      <p class="eq"><span class="cm">solution</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
+      <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub><span class="rad">√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
+      <p>C<sub>1</sub> and C<sub>2</sub> are the two roots of the quadratic; C<sub>1</sub> is the equilibrium complex the quadratic 1:1 model predicts. When protein is dilute this reduces to f(t) = f<sub>eq</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) with k<sub>obs</sub> = k<sub>on</sub>[L] + k<sub>off</sub>.</p>
+      </section>
+      </div>
+    </details>
+
+    <details class="note wide" id="termsCard">
+      <summary><h3>Key terms</h3></summary>
+      <div class="nbody">
+      <ul class="terms">
+  <li><b>[P]<sub>T</sub></b> — total protein concentration, the same at every point.</li>
+  <li><b>[L]<sub>min</sub></b>, <b>[L]<sub>max</sub></b> — first and last total ligand concentrations; points are log-spaced between them.</li>
+  <li><b>dilution</b> — the fold step between neighbouring points, d = ([L]<sub>max</sub>/[L]<sub>min</sub>)<sup>1/(points−1)</sup>. Enter either it or [L]<sub>min</sub>; the other follows.</li>
+  <li><b>Noise SD</b> — standard deviation of the Gaussian error added to each replicate, in fraction bound. One value is shared by every ligand.</li>
+  <li><b>K<sub>d</sub></b> — the true dissociation constant the data were simulated from.</li>
+  <li><b>f at [L]<sub>max</sub></b> — the true fraction bound at the top of the titration: how far up the curve the experiment is designed to reach.</li>
+  <li><b>K<sub>d</sub> fit</b> — the dissociation constant the model returns.</li>
+  <li><b>K fit</b> — the Hill model's raw constant, in concentration<sup>n</sup>; shown only while <em>n</em> is fitted, when its K<sub>d</sub> is K<sup>1/n</sup>.</li>
+  <li><b>Hill n</b> — the cooperativity the fit recovered.</li>
+  <li><b>Cooperativity</b> — how binding at one site changes binding at the next, measured by the Hill coefficient <em>n</em>. At <em>n</em> = 1 sites are independent (or there is only one); <em>n</em> &gt; 1 is positive cooperativity, each binding event making the next easier; <em>n</em> &lt; 1 is negative. <em>n</em> sets the steepness of the curve — 10% to 90% occupancy spans 81<sup>1/n</sup>-fold in free ligand — and is not a count of sites or a stoichiometry.</li>
+  <li><b>[P]<sub>T</sub> fit</b> — the protein concentration the quadratic model returns when it is fitted rather than fixed. Useful when the active concentration is uncertain; it is only well defined when [P]<sub>T</sub> is near or above K<sub>d</sub>, where depletion shapes the curve.</li>
+  <li><b>B<sub>max</sub></b> — the plateau the fitted curve rises to. Hold at 1 for a normalised readout; fit it when the curve may not get there.</li>
+  <li><b>±</b> — asymptotic standard error: how tightly <em>this</em> dataset pins the value. A wrong model can fit precisely.</li>
+  <li><b>RMSE</b> — root-mean-square residual over every replicate point. A correct model lands near the noise SD.</li>
+  <li><b>k<sub>on</sub> (M⁻¹s⁻¹)</b>, <b>k<sub>off</sub> (s⁻¹)</b> — association and dissociation rate constants, tied to the K<sub>d</sub> by K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>. Enter one; the dot marks the one calculated from the other.</li>
+  <li><b>Association time</b> — how long protein and ligand are incubated before the read. Shared by every ligand. The equilibrium curve is read at this time, so a short incubation shows up in the fit.</li>
+  <li><b>k<sub>obs</sub> (s⁻¹)</b> — the rate of approach to equilibrium, k<sub>on</sub>·√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>). Without depletion this is k<sub>on</sub>[L] + k<sub>off</sub>.</li>
+  <li><b>Steady-state</b> — the plateau the association reaches once binding and unbinding balance; for simple 1:1 binding it is the equilibrium the curve is meant to measure. Points read before they get there are pre-steady-state and under-report binding. In the results table, the Steady-state columns give the time to reach it (t<sub>eq</sub>) and how close the top and bottom of the series are at the read (f/f<sub>eq</sub> at [L]<sub>max</sub> and [L]<sub>min</sub>).</li>
+  <li><b>t<sub>eq</sub> (95%)</b> — time to reach 95% of the equilibrium fraction bound; ≈ ln 20 / k<sub>obs</sub>. The ligand's row gives the slowest point in the series: the minimum incubation time.</li>
+  <li><b>f<sub>eq</sub>, f<sub>end</sub></b> — fraction of protein bound at equilibrium, and at the end of the association time.</li>
+  <li><b>f/f<sub>eq</sub> (%)</b> — how close a point got to equilibrium by the read (f<sub>end</sub>/f<sub>eq</sub> in the kinetics results). Under 95%, shown in red, means that point is still rising when read.</li>
+  <li><b>t½</b> — complex half-life, ln 2/k<sub>off</sub>.</li>
+      </ul>
+      </div>
+    </details>
+
+  </div>
+  </div><!-- /accs -->
+
+  </div>
+
+  <footer>
+    <p class="credit"><b>Kelly Arnett</b> · <a href="https://cmi.hms.harvard.edu/" target="_blank" rel="noopener noreferrer">Center for Macromolecular Interactions (CMI)</a>, Harvard Medical School</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var COLORS = ['--s1','--s2','--s3'];
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function col(i){ return cssVar(COLORS[i]) || '#888'; }
+
+var NPTS_MIN = 4, NPTS_MAX = 60;
+
+var state = {
+  preset: null,
+  unit: 'nM',
+  points: 14,
+  // one noise level for the whole experiment: every ligand is read on the
+  // same instrument, so they share it
+  sd: 0.02,
+  scale: 'log',
+  // which end of the series you type: the lowest point, or the fold dilution.
+  // A 14-point, 2-fold series is the usual bench default, so that is where the
+  // panel starts: [L]max is typed and [L]min falls out of it.
+  lowMode: 'dilution',
+  fitSpecific: true,
+  fitQuadratic: true,
+  fitHill: false,
+  bmaxSpec: false,
+  bmaxQuad: false,
+  // quadratic fit: also fit the protein concentration instead of fixing it
+  fitPt: false,
+  // explore kinetics: off by default; ta is the shared association time (s)
+  kin: false,
+  // cooperativity: off by default; while off every ligand binds 1:1 (n = 1)
+  coop: false,
+  ta: 600,
+  // layout preview and, with kinetics on, which curve tab is showing
+  layout: 'A',
+  tab: 'eq',
+  ligands: [
+    { name:'Ligand A', on:true,  pt:0.05, kd:5,   n:1, min:0.06104, max:500,   reps:3 },
+    { name:'Ligand B', on:false, pt:0.05, kd:50,  n:1, min:0.6104,  max:5000,  reps:3 },
+    { name:'Ligand C', on:false, pt:0.05, kd:500, n:1, min:6.104,   max:50000, reps:3 }
+  ]
+};
+
+var SCENARIOS = [
+  { key:'ideal', title:'Ideal conditions',
+    blurb:'Protein concentration well below Kd.',
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = true; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.02;
+      // each ligand topped out at 100*Kd and stepped down two-fold, so all three
+      // are sampled identically relative to their own affinity
+      state.ligands[0] = { name:'Ligand A', on:true,  pt:0.05, kd:5,   n:1, min:0.06104, max:500,   reps:3 };
+      state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:50,  n:1, min:0.6104,  max:5000,  reps:3 };
+      state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:500, n:1, min:6.104,   max:50000, reps:3 };
+    } },
+  { key:'depletion', title:'Ligand depletion',
+    blurb:'Protein at 100× Kd eats its own ligand.',
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = true; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.02;
+      state.ligands[0] = { name:'Ligand A', on:true, pt:100, kd:1, n:1, min:0.1221, max:1000, reps:3 };
+      state.ligands[1] = { name:'Ligand B', on:false, pt:100, kd:1, n:1, min:0.1221, max:1000, reps:3 };
+      state.ligands[2] = { name:'Ligand C', on:false, pt:100, kd:1, n:1, min:0.1221, max:1000, reps:3 };
+    } },
+  { key:'presteady', title:'Pre-steady-state read',
+    blurb:'Slow-off interaction read after 10 min',
+    sets:{ rates:true },
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.02;
+      // a 1 nM binder with koff = 1e-4 /s (kon 1e5): the lowest points need
+      // ~8 h to settle, but the plate is read at 10 min
+      state.kin = true; state.ta = 600; state.tab = 'eq';
+      state.ligands[0] = { name:'Ligand A', on:true,  pt:0.05, kd:1,  n:1, min:0.01221, max:100,  reps:3, kon:1e5, koff:1e-4, kcalc:'on' };
+      state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10, n:1, min:0.1221,  max:1000, reps:3, kon:1e6, koff:1e-2, kcalc:'off' };
+      state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:100,n:1, min:1.221,   max:10000,reps:3, kon:1e6, koff:1e-1, kcalc:'off' };
+    } },
+  { key:'hill', title:'Cooperativity',
+    blurb:'3 curves with variable hill slopes',
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = true; state.scale = 'log';
+      state.coop = true; state.kin = false;
+      state.sd = 0.02;
+      // 16 points of a 2-fold series down from 5000: the shallow n = 0.5 curve
+      // needs the extra decades
+      state.points = 16;
+      state.ligands[0] = { name:'n = 1',   on:true, pt:0.05, kd:50, n:1,   min:0.152588, max:5000, reps:3 };
+      state.ligands[1] = { name:'n = 2',   on:true, pt:0.05, kd:50, n:2,   min:0.152588, max:5000, reps:3 };
+      state.ligands[2] = { name:'n = 0.5', on:true, pt:0.05, kd:50, n:0.5, min:0.152588, max:5000, reps:3 };
+    } },
+  { key:'noise', title:'Noise and replicates',
+    blurb:'Heavy noise in duplicate.',
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = true; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.12;
+      state.ligands[0] = { name:'Ligand A', on:true, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:2 };
+      state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:6 };
+      state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:12 };
+    } }
+];
+
+/* ---------------- models ---------------- */
+
+// the Hill coefficient in force: a ligand's own n only while cooperativity is on
+function hn(L){ return state.coop ? num(L.n, 1) : 1; }
+function thetaHill(Lf, Kd, n){
+  if (Lf <= 0) return 0;
+  var a = Math.pow(Lf / Kd, n);
+  return a / (1 + a);
+}
+function freeLigand(Pt, Lt, Kd, n){
+  if (Lt <= 0) return 0;
+  var lo = 0, hi = Lt, mid;
+  for (var i = 0; i < 60; i++){
+    mid = 0.5 * (lo + hi);
+    if (mid + n * Pt * thetaHill(mid, Kd, n) > Lt) hi = mid; else lo = mid;
+  }
+  return 0.5 * (lo + hi);
+}
+// exact occupancy from mass balance; closed form at n = 1
+function boundFrac(Pt, Lt, Kd, n){
+  if (Pt <= 0) return thetaHill(Lt, Kd, n);
+  if (n === 1){
+    var b = Pt + Lt + Kd;
+    var disc = Math.sqrt(Math.max(b * b - 4 * Pt * Lt, 0));
+    if (b + disc <= 0) return 0;
+    return Math.min(Math.max(2 * Lt / (b + disc), 0), 1);
+  }
+  return thetaHill(freeLigand(Pt, Lt, Kd, n), Kd, n);
+}
+
+/* ---------------- simulated data ---------------- */
+
+// What the plate reader sees. At equilibrium that is the exact occupancy.
+// With Add Kinetics on, each well is read at the end of the association
+// time, so it carries only the fraction of the way to equilibrium the 1:1
+// kinetics have covered by then (the Hill n still sets the end point).
+function readAt(L, x){
+  var pt = Math.max(0, num(L.pt, 0)), f = boundFrac(pt, x, L.kd, hn(L));
+  if (!state.kin || !(L.kon > 0)) return f;
+  return f * kinPoint(pt, x, L.kd, L.kon).prog(state.ta);
+}
+
+// A run of the experiment is one draw of the noise. Each ligand gets its own
+// seed, drawn fresh every time the experiment itself changes - a parameter, a
+// replicate count, a scenario - so repeating a setting is a new experiment, not
+// a replay of the last one. Changing only the models to fit, the axis or a
+// ligand's name re-fits and redraws the SAME points, so you are comparing fits
+// rather than chasing new noise.
+var seeds = [0, 1, 2];
+function newSeed(){ return (Math.random() * 4294967296) >>> 0; }
+function reseed(){ seeds = seeds.map(newSeed); }
+reseed();
+
+function mulberry32(a){
+  return function(){
+    a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng){
+  var u = 1 - rng(), v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function simulate(L, seed){
+  var lo = Math.max(num(L.min, 0.01), 1e-9);
+  var hi = Math.max(num(L.max, lo * 100), lo * 1.0001);
+  var reps = Math.max(1, Math.round(num(L.reps, 3)));
+  var sd = Math.max(0, num(state.sd, 0));
+  var np = clampInt(state.points, NPTS_MIN, NPTS_MAX, 12);
+  var rng = mulberry32(seed), pts = [], raw = [], i, r;
+  for (i = 0; i < np; i++){
+    var x = lo * Math.pow(hi / lo, i / (np - 1));
+    var truth = readAt(L, x);
+    var vals = [], sum = 0;
+    for (r = 0; r < reps; r++){
+      var y = truth + gauss(rng) * sd;
+      vals.push(y); sum += y;
+      raw.push({ x: x, y: y });
+    }
+    var mean = sum / reps, s = 0;
+    if (reps > 1){
+      for (r = 0; r < reps; r++) s += (vals[r] - mean) * (vals[r] - mean);
+      s = Math.sqrt(s / (reps - 1));
+    } else s = null;
+    pts.push({ x: x, mean: mean, sd: s });
+  }
+  return { pts: pts, raw: raw, lo: lo, hi: hi };
+}
+
+/* ---------------- fitting ---------------- */
+
+function sse(raw, predict){
+  var s = 0, i, r;
+  for (i = 0; i < raw.length; i++){ r = raw[i].y - predict(raw[i].x); s += r * r; }
+  return s;
+}
+function rmseOf(raw, predict){ return Math.sqrt(sse(raw, predict) / Math.max(1, raw.length)); }
+
+// B(max) multiplies the curve, so at any Kd (and n) its least-squares value is
+// a closed form. Profiling it out this way keeps the search one- or
+// two-dimensional however many parameters are being reported.
+function bestScale(raw, theta){
+  var sy = 0, ss = 0, i, t;
+  for (i = 0; i < raw.length; i++){
+    t = theta(raw[i].x);
+    sy += raw[i].y * t; ss += t * t;
+  }
+  return (ss > 1e-12 && isFinite(sy / ss)) ? sy / ss : 1;
+}
+function sseB(raw, theta, fitB){
+  var B = fitB ? bestScale(raw, theta) : 1;
+  return sse(raw, function(x){ return B * theta(x); });
+}
+
+// one parameter: log10 Kd (plus B, profiled out)
+function fit1(raw, make, fitB){
+  var lo = -6, hi = 8, best = 0, bestS = Infinity, pass, g, step, s;
+  for (pass = 0; pass < 4; pass++){
+    step = (hi - lo) / 160; best = lo; bestS = Infinity;
+    for (g = lo; g <= hi + 1e-12; g += step){
+      s = sseB(raw, make(Math.pow(10, g)), fitB);
+      if (s < bestS){ bestS = s; best = g; }
+    }
+    lo = best - step; hi = best + step;
+  }
+  var kd = Math.pow(10, best);
+  return { kd: kd, B: fitB ? bestScale(raw, make(kd)) : 1, sse: bestS };
+}
+// two parameters: log10 Kd and Hill n
+function fit2(raw, make, fitB){
+  var kLo = -6, kHi = 8, nLo = 0.2, nHi = 6;
+  var bk = 0, bn = 1, bestS = Infinity, pass, g, h, ks, ns, s;
+  for (pass = 0; pass < 4; pass++){
+    ks = (kHi - kLo) / (pass ? 12 : 56);
+    ns = (nHi - nLo) / (pass ? 10 : 28);
+    bestS = Infinity;
+    for (g = kLo; g <= kHi + 1e-12; g += ks){
+      for (h = nLo; h <= nHi + 1e-12; h += ns){
+        s = sseB(raw, make(Math.pow(10, g), h), fitB);
+        if (s < bestS){ bestS = s; bk = g; bn = h; }
+      }
+    }
+    kLo = bk - ks; kHi = bk + ks;
+    nLo = Math.max(0.2, bn - ns); nHi = Math.min(6, bn + ns);
+  }
+  var kd = Math.pow(10, bk);
+  return { kd: kd, n: bn, B: fitB ? bestScale(raw, make(kd, bn)) : 1, sse: bestS };
+}
+
+// two parameters for the quadratic model: log10 Kd and log10 [P]T, searched
+// on a grid around the [P]T entered (B profiled out as before)
+function fitKP(raw, fitB, pt0){
+  var p0 = Math.log10(Math.max(pt0, 1e-6));
+  var kLo = -6, kHi = 8, pLo = p0 - 4, pHi = p0 + 3;
+  var make = function(kd, pt){ return function(x){ return boundFrac(pt, x, kd, 1); }; };
+  var bk = 0, bp = p0, bestS = Infinity, pass, g, h, ks, ps, s;
+  for (pass = 0; pass < 5; pass++){
+    ks = (kHi - kLo) / (pass ? 12 : 56);
+    ps = (pHi - pLo) / (pass ? 12 : 28);
+    bestS = Infinity;
+    for (g = kLo; g <= kHi + 1e-12; g += ks){
+      for (h = pLo; h <= pHi + 1e-12; h += ps){
+        s = sseB(raw, make(Math.pow(10, g), Math.pow(10, h)), fitB);
+        if (s < bestS){ bestS = s; bk = g; bp = h; }
+      }
+    }
+    kLo = bk - ks; kHi = bk + ks; pLo = bp - ps; pHi = bp + ps;
+  }
+  var kd = Math.pow(10, bk), pt = Math.pow(10, bp);
+  return { kd: kd, pt: pt, B: fitB ? bestScale(raw, make(kd, pt)) : 1, sse: bestS };
+}
+
+/* ---- standard errors -------------------------------------------------
+   Asymptotic (Gauss-Newton) errors: cov = s^2 (J'J)^-1, with the residual
+   variance s^2 = SSR/(N - p) taken over every replicate point, not the
+   binned means. So the reported SE shrinks as 1/sqrt(replicates), which is
+   the behaviour the "noise and replicates" scenario is meant to show.
+   J is built by central differences at the optimum.                      */
+
+function jacobian(raw, at, th){
+  var p = th.length, J = [], plus = [], minus = [], h = [], i, j, tp, tm, row;
+  for (j = 0; j < p; j++){
+    h.push(Math.max(Math.abs(th[j]) * 1e-4, 1e-9));
+    tp = th.slice(); tm = th.slice();
+    tp[j] += h[j]; tm[j] -= h[j];
+    plus.push(at(tp)); minus.push(at(tm));
+  }
+  for (i = 0; i < raw.length; i++){
+    row = [];
+    for (j = 0; j < p; j++) row.push((plus[j](raw[i].x) - minus[j](raw[i].x)) / (2 * h[j]));
+    J.push(row);
+  }
+  return J;
+}
+// Gauss-Jordan with partial pivoting: a fit can carry up to three parameters
+// now (Khalf, n, Bmax), so the closed-form 2x2 no longer covers every case.
+function inv2(A){
+  var p = A.length, i, j, k, M = [], piv, f, tmp, C = [];
+  if (p === 1) return (A[0][0] > 0 && isFinite(A[0][0])) ? [[1 / A[0][0]]] : null;
+  for (i = 0; i < p; i++){
+    M.push([]);
+    for (j = 0; j < p; j++){ if (!isFinite(A[i][j])) return null; M[i].push(A[i][j]); }
+    for (j = 0; j < p; j++) M[i].push(i === j ? 1 : 0);
+  }
+  for (i = 0; i < p; i++){
+    piv = i;
+    for (k = i + 1; k < p; k++) if (Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
+    if (!isFinite(M[piv][i]) || Math.abs(M[piv][i]) < 1e-300) return null;
+    if (piv !== i){ tmp = M[i]; M[i] = M[piv]; M[piv] = tmp; }
+    f = M[i][i];
+    for (j = 0; j < 2 * p; j++) M[i][j] /= f;
+    for (k = 0; k < p; k++){
+      if (k === i) continue;
+      f = M[k][i];
+      if (!f) continue;
+      for (j = 0; j < 2 * p; j++) M[k][j] -= f * M[i][j];
+    }
+  }
+  for (i = 0; i < p; i++) C.push(M[i].slice(p));
+  return C;
+}
+function covOf(raw, at, th){
+  var p = th.length, N = raw.length, dof = N - p, i, j, k, A = [], s2, J, C;
+  if (dof < 1) return null;
+  s2 = sse(raw, at(th)) / dof;
+  J = jacobian(raw, at, th);
+  for (j = 0; j < p; j++){ A.push([]); for (k = 0; k < p; k++) A[j].push(0); }
+  for (i = 0; i < N; i++)
+    for (j = 0; j < p; j++)
+      for (k = 0; k < p; k++) A[j][k] += J[i][j] * J[i][k];
+  C = inv2(A);
+  if (!C) return null;
+  for (j = 0; j < p; j++) for (k = 0; k < p; k++) C[j][k] *= s2;
+  return C;
+}
+function seAt(C, j){
+  return (C && isFinite(C[j][j]) && C[j][j] > 0) ? Math.sqrt(C[j][j]) : null;
+}
+
+// Specific binding is reported as f = L^n / (K + L^n), so K carries units of
+// concentration^n. The search runs on the half-saturating concentration
+// Khalf = K^(1/n), which is the same curve family but far better conditioned.
+function fitLigand(L, sim){
+  var out = [], pt = Math.max(0, num(L.pt, 0)), f, at, th, C, g0, g1, v, seK, iB;
+
+  if (state.fitSpecific){
+    var fitB = state.bmaxSpec;
+    if (state.fitHill){
+      f = fit2(sim.raw, function(kh, n){ return function(x){ return thetaHill(x, kh, n); }; }, fitB);
+      th = fitB ? [f.kd, f.n, f.B] : [f.kd, f.n];
+      at = function(t){
+        var B = fitB ? t[2] : 1;
+        return function(x){ return B * thetaHill(x, t[0], t[1]); };
+      };
+      C = covOf(sim.raw, at, th);
+      // K = Khalf^n, so its error needs the delta method over both parameters
+      seK = null;
+      if (C){
+        g0 = f.n * Math.pow(f.kd, f.n - 1);
+        g1 = Math.pow(f.kd, f.n) * Math.log(f.kd);
+        v = g0 * g0 * C[0][0] + 2 * g0 * g1 * C[0][1] + g1 * g1 * C[1][1];
+        seK = (isFinite(v) && v > 0) ? Math.sqrt(v) : null;
+      }
+      out.push({ model:'specific', kHalf:f.kd, K:Math.pow(f.kd, f.n), n:f.n, fittedN:true,
+                 B:f.B, fittedB:fitB, seB: fitB ? seAt(C, 2) : null,
+                 seHalf: seAt(C, 0), seK: seK, seN: seAt(C, 1),
+                 rmse: rmseOf(sim.raw, at(th)) });
+    } else {
+      f = fit1(sim.raw, function(kh){ return function(x){ return thetaHill(x, kh, 1); }; }, fitB);
+      th = fitB ? [f.kd, f.B] : [f.kd];
+      at = function(t){
+        var B = fitB ? t[1] : 1;
+        return function(x){ return B * thetaHill(x, t[0], 1); };
+      };
+      C = covOf(sim.raw, at, th);
+      out.push({ model:'specific', kHalf:f.kd, K:f.kd, n:1, fittedN:false,
+                 B:f.B, fittedB:fitB, seB: fitB ? seAt(C, 1) : null,
+                 seHalf: seAt(C, 0), seK: seAt(C, 0), seN: null,
+                 rmse: rmseOf(sim.raw, at(th)) });
+    }
+  }
+
+  if (state.fitQuadratic){
+    var fitBq = state.bmaxQuad;
+    if (state.fitPt){
+      f = fitKP(sim.raw, fitBq, pt);
+      th = fitBq ? [f.kd, f.pt, f.B] : [f.kd, f.pt];
+      at = function(t){
+        var B = fitBq ? t[2] : 1;
+        return function(x){ return B * boundFrac(Math.max(0, t[1]), x, t[0], 1); };
+      };
+      C = covOf(sim.raw, at, th);
+      out.push({ model:'quadratic', kHalf:f.kd, K:f.kd, n:1, fittedN:false,
+                 pt:f.pt, sePt: seAt(C, 1), fittedPt:true,
+                 B:f.B, fittedB:fitBq, seB: fitBq ? seAt(C, 2) : null,
+                 seHalf: seAt(C, 0), seK: seAt(C, 0), seN: null,
+                 rmse: rmseOf(sim.raw, at(th)) });
+    } else {
+      f = fit1(sim.raw, function(kd){ return function(x){ return boundFrac(pt, x, kd, 1); }; }, fitBq);
+      th = fitBq ? [f.kd, f.B] : [f.kd];
+      at = function(t){
+        var B = fitBq ? t[1] : 1;
+        return function(x){ return B * boundFrac(pt, x, t[0], 1); };
+      };
+      C = covOf(sim.raw, at, th);
+      out.push({ model:'quadratic', kHalf:f.kd, K:f.kd, n:1, fittedN:false,
+                 B:f.B, fittedB:fitBq, seB: fitBq ? seAt(C, 1) : null,
+                 seHalf: seAt(C, 0), seK: seAt(C, 0), seN: null,
+                 rmse: rmseOf(sim.raw, at(th)) });
+    }
+  }
+  return out;
+}
+
+/* ---------------- helpers ---------------- */
+
+function sigfig(v, d){
+  if (!isFinite(v)) return '';
+  return String(parseFloat(Number(v).toPrecision(d || 4)));
+}
+function num(v, fb){ return (typeof v === 'number' && isFinite(v)) ? v : fb; }
+function clampInt(v, lo, hi, fb){
+  var n = Math.round(num(v, NaN));
+  if (!isFinite(n)) return fb;
+  return Math.min(hi, Math.max(lo, n));
+}
+function fmt(v, sig){
+  if (v === null || v === undefined || !isFinite(v)) return '—';
+  if (v === 0) return '0';
+  sig = sig || 3;
+  var a = Math.abs(v);
+  if (a >= 1e5 || a < 1e-3){
+    var e = v.toExponential(1).split('e');
+    return e[0] + '×10' + sup(parseInt(e[1], 10));
+  }
+  var d = Math.max(0, sig - 1 - Math.floor(Math.log10(a)));
+  var s = v.toFixed(Math.min(d, 6));
+  if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+  return s;
+}
+function sup(n){
+  var m = { '-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴',
+            '5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹' };
+  return String(n).split('').map(function(c){ return m[c] || c; }).join('');
+}
+function esc(s){
+  return String(s).replace(/[&<>"]/g, function(c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c];
+  });
+}
+function active(){
+  return state.ligands.map(function(l, i){ return { l:l, i:i }; })
+    .filter(function(o){ return o.l.on && o.l.kd > 0 && isFinite(o.l.kd); });
+}
+
+/* ---------------- build ---------------- */
+
+var cache = null;
+
+function build(){
+  var act = active(), groups = [], lo = Infinity, hi = -Infinity;
+
+  act.forEach(function(o){
+    var sim = simulate(o.l, seeds[o.i]);
+    lo = Math.min(lo, sim.lo); hi = Math.max(hi, sim.hi);
+    groups.push({
+      idx: o.i, name: o.l.name, L: o.l, sim: sim,
+      fits: fitLigand(o.l, sim),
+      mid: o.l.kd + hn(o.l) * Math.max(0, num(o.l.pt, 0)) / 2
+    });
+  });
+
+  if (!isFinite(lo) || !isFinite(hi) || hi <= lo){ lo = 0.01; hi = 1000; }
+  cache = { groups: groups, d: [lo, hi] };
+  return cache;
+}
+
+/* ---------------- scales ---------------- */
+
+var W = 860, H = 380, M = { l: 68, r: 28, t: 18, b: 62 };
+
+// The viewBox is matched to the element's real pixel size before every draw.
+// Without this a wide window would scale the whole coordinate system, blowing
+// up tick text, stroke widths and markers; this way the extra width becomes
+// plot area and everything else keeps the size it was designed at.
+// The viewBox is matched to the element's real pixel size. Height comes from
+// the window, never past 2:1, and a plot alone on its row gives back the width
+// it cannot use as margin either side. The association plot borrows the same
+// height so the two read as a pair.
+function sizePlot(){ layoutSizes(); }
+
+// One pass sizes both curves. The page is measured with everything at its
+// natural size and the kinetic plot left out, so the result never feeds back.
+// The curves then take whatever height brings the page's tallest column to
+// the bottom of the window (or to the parameters panel, if that is taller),
+// but always stay landscape: the plotting area is never taller than 1/1.3 of
+// its width, and never more than 2.4x wider than tall (centred instead).
+var ASPECT_MIN = 1.15, ASPECT_MAX = 2.2, KIN_SHARE = 0.72;
+var EXTRA_H = 50;
+function layoutSizes(){
+  var stage = document.getElementById('stage'), main = document.querySelector('.stage .main');
+  var svg = document.getElementById('plot'), kc = document.getElementById('kinChart');
+  if (!stage || !main || !svg) return;
+  // the plot's own box: the panel less the ligand legend beside the curves
+  var prow = svg.parentNode.parentNode, leg = document.getElementById('eqSide');
+  // room is kept on both sides for the legend, so the plot stays centred
+  var cw = Math.round(prow.clientWidth);
+  if (!cw) return;
+  var lay = state.layout, kinOn = state.kin, stacked = kinOn && lay === 'C';
+  var wide = window.innerWidth > 1000;
+  stage.classList.add('measure');
+  var eqH0 = svg.getBoundingClientRect().height;
+  var eqChrome = main.getBoundingClientRect().height - eqH0;
+  var kinChrome = kinOn ? kc.getBoundingClientRect().height : 0;
+  var colM = document.getElementById('colM'), colR = document.getElementById('colR');
+  var params = document.querySelector('.stage .params');
+  var midBottom = colM.getBoundingClientRect().bottom + window.scrollY;
+  // The side columns set the height: the curves end level with the taller of
+  // the parameters and the models + results column. With kinetics off, room is
+  // kept for the kinetics rows, so switching it on leaves the curves the same
+  // size. The window no longer stretches them, so the design notes below show.
+  var rBottom = 0;
+  if (colR && !colR.hidden && state.layout !== 'A'){
+    rBottom = colR.getBoundingClientRect().bottom + window.scrollY;
+    var tr = colR.querySelector('tbody tr:not(.sec-row)'), sr = colR.querySelector('tbody tr.sec-row');
+    if (!kinOn && tr) rBottom += 4 * tr.getBoundingClientRect().height + (sr ? sr.getBoundingClientRect().height : 30);
+  }
+  var colLeft = document.querySelector('.stage .colL');
+  var other = Math.max(colLeft ? colLeft.getBoundingClientRect().bottom + window.scrollY : 0, rBottom);
+  stage.classList.remove('measure');
+  // ...but use the window too, ending ~140 px short of it so the top of the
+  // design notes still shows below
+  // wide: 50 px taller than the parameters column, which stretches to match
+  var target = wide ? other + EXTRA_H : Math.max(window.innerHeight - 16, other);
+  var T = eqH0 + (target - midBottom);         // height the curve(s) may share
+  var plotMax = function(w){ return Math.round((w - M.l - M.r) / ASPECT_MIN + M.t + M.b); };
+  var plotMinW = function(h){ return Math.round((h - M.t - M.b) * ASPECT_MAX + M.l + M.r); };
+  var eqH, kinH = 0;
+  if (!wide){
+    eqH = Math.min(plotMax(cw), Math.max(280, Math.round(cw / 1.6)));
+    kinH = Math.max(220, Math.round(eqH * 0.8));
+  } else if (stacked){
+    eqH = Math.round(T / (1 + KIN_SHARE));
+    eqH = Math.max(250, Math.min(eqH, plotMax(cw)));
+    kinH = Math.max(230, Math.min(Math.round(T - eqH), Math.round(eqH * KIN_SHARE / 0.6), plotMax(cw)));
+  } else {
+    // never shorter than a comfortable landscape plot, even when the side
+    // columns are short (one ligand)
+    var floor = Math.min(plotMax(cw), Math.max(300, Math.min(340, Math.round((cw - M.l - M.r) / ASPECT_MAX + M.t + M.b))));
+    eqH = Math.max(floor, Math.min(T, plotMax(cw)));
+    // tabbed: the kinetic panel ends level with the equilibrium panel
+    if (kinOn) kinH = eqH;   // same plot, legends beside both
+  }
+  H = Math.round(eqH);
+  W = Math.max(380, Math.min(cw, plotMinW(H)));
+  window.W_EQ = W; window.H_EQ = H;
+  window.W_KIN = kinOn ? Math.max(260, Math.min(cw, stacked ? W : plotMinW(kinH))) : 0;
+  window.H_KIN = Math.round(kinH);
+  svg.style.maxWidth = W + 'px';
+  svg.parentNode.style.width = W + 'px';
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+}
+var Y0 = -0.09, Y1 = 1.12;
+
+function sx(x, d){
+  var t;
+  if (state.scale === 'log'){
+    t = (Math.log10(Math.max(x, d[0] * 1e-9)) - Math.log10(d[0])) / (Math.log10(d[1]) - Math.log10(d[0]));
+  } else {
+    t = (x - d[0]) / (d[1] - d[0]);
+  }
+  return M.l + Math.max(-0.02, Math.min(1.02, t)) * (W - M.l - M.r);
+}
+function sy(y){
+  var t = (y - Y0) / (Y1 - Y0);
+  return (H - M.b) - Math.max(-0.03, Math.min(1.03, t)) * (H - M.b - M.t);
+}
+function xTicks(d){
+  var t = [], e, v;
+  if (state.scale === 'log'){
+    var lo = Math.floor(Math.log10(d[0])), hi = Math.ceil(Math.log10(d[1]));
+    var decades = hi - lo, step = decades <= 7 ? 1 : Math.ceil(decades / 7);
+    for (e = lo; e <= hi; e += step){
+      v = Math.pow(10, e);
+      if (v >= d[0] * 0.999 && v <= d[1] * 1.001) t.push(v);
+    }
+  } else {
+    var range = d[1] - d[0], raw = range / 6;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw))), nr = raw / mag;
+    var s = nr < 1.5 ? mag : nr < 3 ? 2 * mag : nr < 7 ? 5 * mag : 10 * mag;
+    for (v = Math.ceil(d[0] / s) * s; v <= d[1] + s * 1e-6; v += s) t.push(v);
+  }
+  return t;
+}
+
+/* ---------------- drawing ---------------- */
+
+function pathOf(xs, ys, d){
+  var p = '', i, px, py;
+  for (i = 0; i < xs.length; i++){
+    px = sx(xs[i], d); py = sy(ys[i]);
+    if (!isFinite(px) || !isFinite(py)) throw new Error('non-finite point in curve at x=' + xs[i]);
+    p += (i ? 'L' : 'M') + px.toFixed(2) + ',' + py.toFixed(2);
+  }
+  return p;
+}
+
+// the scale switch sits under the right end of the x-axis, in the plot's
+// bottom margin beside the axis title
+function placeScale(){ return; }
+function placeScaleOld(){
+  var row = document.querySelector('.plotbox > .scalerow'), svg = document.getElementById('plot');
+  if (!row || !svg) return;
+  var pb = row.parentNode.getBoundingClientRect(), sr = svg.getBoundingClientRect();
+  if (!sr.width) return;
+  var k = sr.width / W;
+  row.style.right = Math.round(pb.right - sr.right + M.r * k) + 'px';
+  row.style.bottom = Math.round(pb.bottom - sr.bottom + 2) + 'px';
+}
+function draw(){
+  // Sizing reads the laid-out page, and its own result changes that layout, so
+  // run it until it stops moving rather than trusting a single pass - one
+  // toggle should never leave the plot a few pixels short of where the same
+  // state started.
+  var pw = -1, ph = -1;
+  for (var pass = 0; pass < 6 && (W !== pw || H !== ph); pass++){ pw = W; ph = H; sizePlot(); }
+  // A linear axis reads as a share of the total added, so it starts at zero
+  // whatever the lowest point is; a log axis cannot, and keeps the data range.
+  var c = cache, d = state.scale === 'log' ? c.d : [0, c.d[1]], s = '', i;
+  var ay = H - M.b;
+  // draw C first and A last, so ligand A sits in front
+  var back = c.groups.slice().reverse();
+
+  xTicks(d).forEach(function(t){
+    var x = sx(t, d);
+    s += '<line class="gridline" x1="' + x + '" y1="' + M.t + '" x2="' + x + '" y2="' + ay + '"/>';
+    s += '<text class="tick" x="' + x + '" y="' + (ay + 28) + '" text-anchor="middle">' + esc(fmt(t, 2)) + '</text>';
+  });
+  [0, 0.25, 0.5, 0.75, 1].forEach(function(f){
+    var y = sy(f);
+    s += '<line class="gridline" x1="' + M.l + '" y1="' + y + '" x2="' + (W - M.r) + '" y2="' + y + '"/>';
+    s += '<text class="tick" x="' + (M.l - 12) + '" y="' + (y + 5) + '" text-anchor="end">' + f.toFixed(2) + '</text>';
+  });
+  s += '<line class="axisline" x1="' + M.l + '" y1="' + ay + '" x2="' + (W - M.r) + '" y2="' + ay + '"/>';
+  s += '<line class="axisline" x1="' + M.l + '" y1="' + M.t + '" x2="' + M.l + '" y2="' + ay + '"/>';
+
+  // the scale is named by the toggle in the corner, so the axis does not repeat it
+  var xlab = 'total ligand added [L]ₜ  (' + state.unit + ')';
+  s += '<text class="alab" x="' + ((M.l + W - M.r) / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(xlab) + '</text>';
+  s += '<text class="alab" x="' + (-(M.t + ay) / 2) + '" y="15" transform="rotate(-90)" text-anchor="middle">fraction of protein bound</text>';
+
+  var xs = [], N = 200;
+  for (i = 0; i < N; i++){
+    xs.push(state.scale === 'log'
+      ? Math.pow(10, Math.log10(d[0]) + (Math.log10(d[1]) - Math.log10(d[0])) * i / (N - 1))
+      : d[0] + (d[1] - d[0]) * i / (N - 1));
+  }
+
+  // Each fit's own Kd goes below the axis. The marks
+  // carry position only — the numbers are in the table. A fit is placed by its
+  // half-saturating concentration K^(1/n), the only version of K that lives on
+  // the x scale once n is being fitted. Fill follows the model: solid for the
+  // quadratic, hollow for specific binding.
+  back.forEach(function(g){
+    var gc = col(g.idx % 3);
+    // quadratic first so the hollow specific-binding outline lands on top and
+    // stays visible when the two models agree and the marks coincide
+    g.fits.slice().sort(function(a){ return a.model === 'quadratic' ? -1 : 1; }).forEach(function(f){
+      if (!isFinite(f.kHalf) || f.kHalf < d[0] || f.kHalf > d[1]) return;
+      var kx = sx(f.kHalf, d), spec = f.model === 'specific';
+      // the hollow mark is inset, so when the two models agree and the marks
+      // coincide the result reads as one nested glyph rather than a lost mark
+      var w = spec ? 3.2 : 5, top = spec ? ay + 6.2 : ay + 4, base = spec ? ay + 11.2 : ay + 12;
+      s += '<line class="kd-line' + (spec ? '' : ' dotted') + '" x1="' + kx + '" y1="' + M.t +
+           '" x2="' + kx + '" y2="' + (ay + 3) + '" stroke="' + gc + '"/>';
+      s += '<polygon points="' + (kx - w) + ',' + base + ' ' + (kx + w) + ',' + base + ' ' + kx + ',' + top +
+           '" fill="' + (spec ? 'var(--surface)' : gc) + '" stroke="' + gc + '" stroke-width="1.5"/>';
+    });
+  });
+
+  // while the wells are read before equilibrium, the true equilibrium curve
+  // sits faintly underneath, so the gap the incubation leaves is visible
+  if (state.kin) back.forEach(function(g){
+    var gc = col(g.idx % 3), pt = Math.max(0, num(g.L.pt, 0));
+    var ys = xs.map(function(x){ return boundFrac(pt, x, g.L.kd, hn(g.L)); });
+    s += '<path class="truecurve" d="' + pathOf(xs, ys, d) + '" stroke="' + gc + '"/>';
+  });
+
+  // fitted curves: the solid specific-binding curve first, so the dotted
+  // quadratic stays visible on top where the two agree
+  back.forEach(function(g){
+    var gc = col(g.idx % 3), pt = Math.max(0, num(g.L.pt, 0));
+    g.fits.slice().sort(function(a){ return a.model === 'quadratic' ? 1 : -1; }).forEach(function(f){
+      var B = num(f.B, 1);
+      var ys = xs.map(function(x){
+        return B * (f.model === 'quadratic' ? boundFrac(f.fittedPt ? f.pt : pt, x, f.kHalf, 1) : thetaHill(x, f.kHalf, f.n));
+      });
+      s += '<path class="curve' + (f.model === 'quadratic' ? ' dotted' : '') + '" d="' +
+           pathOf(xs, ys, d) + '" stroke="' + gc + '"/>';
+    });
+  });
+
+  // measured points last
+  back.forEach(function(g){
+    var gc = col(g.idx % 3);
+    g.sim.pts.forEach(function(p){
+      var px = sx(p.x, d);
+      if (p.sd !== null && p.sd > 0){
+        var y1 = sy(p.mean + p.sd), y2 = sy(p.mean - p.sd);
+        s += '<line class="ebar" x1="' + px + '" y1="' + y1 + '" x2="' + px + '" y2="' + y2 + '" stroke="' + gc + '"/>';
+        s += '<line class="ebar" x1="' + (px - 3.5) + '" y1="' + y1 + '" x2="' + (px + 3.5) + '" y2="' + y1 + '" stroke="' + gc + '"/>';
+        s += '<line class="ebar" x1="' + (px - 3.5) + '" y1="' + y2 + '" x2="' + (px + 3.5) + '" y2="' + y2 + '" stroke="' + gc + '"/>';
+      }
+      s += '<circle class="obs" cx="' + px.toFixed(2) + '" cy="' + sy(p.mean).toFixed(2) + '" r="4.2" fill="' + gc + '"/>';
+    });
+  });
+
+  document.getElementById('plot').innerHTML = s;
+  hideTip();
+  placeScale();
+}
+
+/* ---------------- hover readout ---------------- */
+
+// What each fitted curve predicts at one concentration. The pointer picks a
+// concentration; every active model answers for it, so nothing has to be
+// aimed at a 3px line. The readout only restates what the curves already draw
+// and the table already holds - it is a convenience, never the only way in.
+
+var hoverAt = null;   // x of the hairline in plot coordinates, kept for the keyboard
+
+function domainNow(){ return state.scale === 'log' ? cache.d : [0, cache.d[1]]; }
+
+// plot coordinate -> concentration, the inverse of sx within the axes
+function xOfPixel(ux, d){
+  var t = (ux - M.l) / (W - M.l - M.r);
+  t = Math.max(0, Math.min(1, t));
+  return state.scale === 'log'
+    ? Math.pow(10, Math.log10(d[0]) + t * (Math.log10(d[1]) - Math.log10(d[0])))
+    : d[0] + t * (d[1] - d[0]);
+}
+
+function clearMarks(){
+  var g = document.getElementById('hoverlayer');
+  if (g && g.parentNode) g.parentNode.removeChild(g);
+}
+function hideTip(){
+  var t = document.getElementById('tip');
+  if (t) t.hidden = true;
+  clearMarks();
+  hoverAt = null;
+}
+
+// value of one fitted curve at x, the same expression the curve is drawn from
+function predict(g, f, x){
+  var pt = Math.max(0, num(g.L.pt, 0)), B = num(f.B, 1);
+  return B * (f.model === 'quadratic' ? boundFrac(f.fittedPt ? f.pt : pt, x, f.kHalf, 1) : thetaHill(x, f.kHalf, f.n));
+}
+
+// ux is a position on the x axis in plot coordinates - any position, not only
+// the concentrations that were titrated: every curve is defined everywhere.
+function showTipAt(ux){
+  var svg = document.getElementById('plot'), tip = document.getElementById('tip');
+  var box = document.querySelector('.plotbox');
+  if (!cache || !cache.groups.length || !svg || !tip){ hideTip(); return; }
+  ux = Math.max(M.l, Math.min(W - M.r, ux));
+  hoverAt = ux;
+  var d = domainNow(), x = xOfPixel(ux, d);
+  if (!isFinite(x)){ hideTip(); return; }
+
+  // marks in the plot, in the plot's own coordinates
+  var marks = '<line class="hair" x1="' + ux.toFixed(2) + '" y1="' + M.t + '" x2="' + ux.toFixed(2) +
+              '" y2="' + (H - M.b) + '"/>';
+  var rows = [];
+  cache.groups.forEach(function(g){
+    var gc = col(g.idx % 3);
+    g.fits.forEach(function(f){
+      var y = predict(g, f, x);
+      if (!isFinite(y)) return;
+      // hollow, so the curve and any data point under it stay readable
+      marks += '<circle class="hdot" cx="' + ux.toFixed(2) + '" cy="' + sy(y).toFixed(2) +
+               '" r="5" stroke="' + gc + '"/>';
+      rows.push({ name: g.name, model: f.model, colour: gc, y: y });
+    });
+  });
+  clearMarks();
+  var layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  layer.setAttribute('id', 'hoverlayer');
+  layer.innerHTML = marks;
+  svg.appendChild(layer);
+
+  // the readout itself. Ligand names are typed by the reader, so they are set
+  // as text, never as markup.
+  tip.textContent = '';
+  var head = document.createElement('div');
+  head.className = 'tip-x';
+  head.textContent = '[L]ₜ  ' + fmt(x, 3) + ' ' + state.unit;
+  tip.appendChild(head);
+  if (!rows.length){
+    var none = document.createElement('div');
+    none.className = 'tip-none';
+    none.textContent = 'no model selected';
+    tip.appendChild(none);
+  } else {
+    var wrap = document.createElement('div');
+    wrap.className = 'tip-rows';
+    rows.forEach(function(r){
+      var key = document.createElement('i');
+      key.className = 'tip-k' + (r.model === 'quadratic' ? ' dotted' : '');
+      key.style.borderTopColor = r.colour;
+      var nm = document.createElement('span');
+      nm.className = 'tip-n';
+      nm.textContent = r.name + ' · ' +
+        (r.model === 'quadratic' ? 'quadratic' : specificName('short'));
+      var val = document.createElement('span');
+      val.className = 'tip-v';
+      val.textContent = r.y.toFixed(3);
+      wrap.appendChild(key); wrap.appendChild(nm); wrap.appendChild(val);
+    });
+    tip.appendChild(wrap);
+  }
+  tip.hidden = false;
+
+  // place it beside the hairline, inside the plot, flipping before it overflows
+  var sr = svg.getBoundingClientRect(), br = box.getBoundingClientRect();
+  var scale = sr.width / W;
+  var px = (sr.left - br.left) + ux * scale;
+  var left = px + 14;
+  if (left + tip.offsetWidth > (sr.left - br.left) + sr.width - 4){
+    left = px - 14 - tip.offsetWidth;
+  }
+  left = Math.max(sr.left - br.left + 4, left);
+  var top = (sr.top - br.top) + M.t * scale + 6;
+  top = Math.min(top, (sr.top - br.top) + (H - M.b) * scale - tip.offsetHeight - 2);
+  tip.style.left = Math.round(left) + 'px';
+  tip.style.top = Math.round(Math.max(0, top)) + 'px';
+}
+
+function plotX(clientX){
+  var svg = document.getElementById('plot'), sr = svg.getBoundingClientRect();
+  if (!sr.width) return null;
+  return (clientX - sr.left) * (W / sr.width);
+}
+
+(function wireHover(){
+  var svg = document.getElementById('plot');
+  if (!svg) return;
+  var move = function(ev){
+    if (!cache) return;
+    var sr = svg.getBoundingClientRect(), scale = sr.width / W;
+    var inside = ev.clientX >= sr.left + (M.l - 16) * scale &&
+                 ev.clientX <= sr.left + (W - M.r + 16) * scale &&
+                 ev.clientY >= sr.top + (M.t - 10) * scale &&
+                 ev.clientY <= sr.top + (H - M.b + 10) * scale;
+    if (!inside){ hideTip(); return; }
+    var ux = plotX(ev.clientX);
+    if (ux === null) hideTip(); else showTipAt(ux);
+  };
+  svg.addEventListener('pointermove', move);
+  svg.addEventListener('pointerdown', move);
+  svg.addEventListener('pointerleave', hideTip);
+  svg.addEventListener('blur', hideTip);
+  // the same readout from the keyboard: step along the titration points
+  svg.addEventListener('keydown', function(ev){
+    if (!cache) return;
+    // a fiftieth of the axis per press, a fifth of that with Shift held
+    var step = (W - M.l - M.r) / (ev.shiftKey ? 250 : 50);
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft'){
+      var at = hoverAt === null ? (ev.key === 'ArrowRight' ? M.l : W - M.r) : hoverAt;
+      showTipAt(at + (ev.key === 'ArrowRight' ? step : -step));
+      ev.preventDefault();
+    } else if (ev.key === 'Home'){ showTipAt(M.l); ev.preventDefault(); }
+    else if (ev.key === 'End'){ showTipAt(W - M.r); ev.preventDefault(); }
+    else if (ev.key === 'Escape'){ hideTip(); }
+  });
+  window.addEventListener('scroll', hideTip, true);
+  // a tap elsewhere puts the readout away: pointerleave does not fire on touch
+  document.addEventListener('pointerdown', function(ev){
+    if (!svg.contains(ev.target)) hideTip();
+  });
+})();
+
+/* ---------------- kinetics ---------------- */
+
+// P + L <-> PL in solution, with both partners depleted. The rate equation
+//   d[PL]/dt = kon (Pt - PL)(Lt - PL) - koff PL
+// has an exact solution. With C1 < C2 the roots of the right-hand side
+// (C1 is the equilibrium complex) and r = kon (C2 - C1):
+//   PL(t) = C1 C2 (1 - e^-rt) / (C2 - C1 e^-rt)
+// r is the observed rate; without depletion it reduces to kon L + koff.
+// Concentrations stay in the panel's unit; only the rate needs molar.
+function nMper(u){ return u === 'pM' ? 1e-3 : u === 'nM' ? 1 : u === 'mM' ? 1e6 : 1e3; }
+function toM(){ return nMper(state.unit) * 1e-9; }
+
+// one of kon / koff is typed, the other follows from the Kd
+function syncK(L){
+  if (!(L.kon > 0)) L.kon = 1e6;
+  if (L.kcalc !== 'on' && L.kcalc !== 'off' && L.kcalc !== 'kd') L.kcalc = 'off';   // default: koff follows from Kd and kon
+  if (L.kcalc === 'kd'){
+    // both rates entered: the Kd follows from them (only while kinetics is on)
+    if (!(L.koff > 0)) L.koff = L.kon * Math.max(num(L.kd, 1), 0) * toM();
+    if (state.kin) L.kd = +((L.koff / L.kon) / toM()).toPrecision(6);
+    return;
+  }
+  var KdM = Math.max(num(L.kd, 0), 0) * toM();
+  if (!(KdM > 0)) return;
+  if (L.kcalc === 'off'){ L.koff = L.kon * KdM; }
+  else { if (!(L.koff > 0)) L.koff = L.kon * KdM; L.kon = L.koff / KdM; }
+}
+
+function kinPoint(Pt, Lt, Kd, kon){
+  var b = Pt + Lt + Kd, sq = Math.sqrt(Math.max(b * b - 4 * Pt * Lt, 0));
+  var C2 = (b + sq) / 2, C1 = C2 > 0 ? Pt * Lt / C2 : 0;
+  var r = kon * sq * toM();                         // s^-1
+  var feq = boundFrac(Pt, Lt, Kd, 1);
+  // fraction of the way to equilibrium at time t
+  var prog = function(t){
+    if (t <= 0) return 0;
+    var E = Math.exp(-r * t);
+    return C2 > 0 ? C2 * (1 - E) / (C2 - C1 * E) : 1 - E;
+  };
+  var E95 = C2 > 0 ? 0.05 * C2 / (C2 - 0.95 * C1) : 0.05;
+  return { Lt: Lt, feq: feq, kobs: r, t95: r > 0 ? -Math.log(E95) / r : Infinity, prog: prog,
+           f: function(t){ return feq * prog(t); } };
+}
+
+function sci(v){
+  if (!isFinite(v)) return '';
+  if (v === 0) return '0';
+  var e = Math.floor(Math.log10(Math.abs(v)));
+  if (e >= -2 && e <= 3) return String(+v.toPrecision(3));
+  return String(+(v / Math.pow(10, e)).toFixed(2)) + 'e' + e;
+}
+function sciPretty(v){
+  if (!isFinite(v) || v <= 0) return '—';
+  var e = Math.floor(Math.log10(v));
+  if (e >= -2 && e <= 3) return String(+v.toPrecision(3));
+  var m = +(v / Math.pow(10, e)).toFixed(2);
+  return (m === 1 ? '' : m + '×') + '10' + sup(e);
+}
+function parseSci(str){
+  var v = parseFloat(String(str).trim().replace(/[×x]\s*10\^?/i, 'e').replace(/,/g, ''));
+  return isFinite(v) ? v : NaN;
+}
+function dur(s){
+  if (!isFinite(s)) return '—';
+  if (s < 60) return (+s.toPrecision(3)) + ' s';
+  if (s < 3600) return (+(s / 60).toPrecision(3)) + ' m';
+  if (s < 86400 * 2) return (+(s / 3600).toPrecision(3)) + ' h';
+  return (+(s / 86400).toPrecision(3)) + ' d';
+}
+
+// one hue per ligand, matching the swatches; darkest = highest concentration
+var HUES = [214, 18, 158];
+function shade(ai, q, n){
+  var dark = (parseFloat(cssVar('--ramp-l')) || 44) > 55;
+  var f = n <= 1 ? 0 : q / (n - 1);
+  var l = dark ? 82 - f * 40 : 26 + f * 46;
+  var sat = ai === 1 ? 82 : ai === 2 ? 58 : 68;
+  return 'hsl(' + HUES[ai] + ' ' + sat + '% ' + l.toFixed(0) + '%)';
+}
+function niceTicks(a, b, count){
+  var span = b - a, step0 = span / count, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  var err = step0 / mag, step = (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1) * mag;
+  var out = [];
+  for (var v = Math.ceil(a / step) * step; v <= b + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+
+function kinRowHtml(L, i){
+  var dot = function(kc){
+    var on = L.kcalc === kc;
+    return '<button type="button" class="calcdot" data-kc="' + kc + '" data-i="' + i + '" aria-pressed="' + on +
+      '" title="' + (on ? 'Calculated from the Kd and the other rate' : 'Calculate this from the Kd and the other rate') +
+      '" aria-label="Calculate k' + kc + ' for ' + esc(L.name) + '"></button>';
+  };
+  var field = function(f, label){
+    var calc = L.kcalc === f.slice(1);
+    return '<div><div class="kl"><label for="' + f + i + '">' + label + '</label>' + dot(f.slice(1)) + '</div>' +
+      '<input type="text" inputmode="decimal" spellcheck="false" id="' + f + i + '" data-f="' + f + '" data-i="' + i + '"' +
+      (calc ? ' class="calc" readonly tabindex="-1"' : '') + ' value="' + sci(L[f]) + '"></div>';
+  };
+  return field('kon', 'k<sub>on</sub> (M⁻¹s⁻¹)').replace('<div>', '<div class="kon">') + field('koff', 'k<sub>off</sub> (s⁻¹)');
+}
+
+// rewrite the rate fields in place, leaving the one being typed in alone
+function syncKinFields(all){
+  state.ligands.forEach(function(L, i){
+    ['kon', 'koff'].forEach(function(f){
+      var el = document.getElementById(f + i);
+      if (el && (all || document.activeElement !== el)) el.value = sci(L[f]);
+    });
+    var kdEl = document.getElementById('kd' + i);
+    if (kdEl && L.kcalc === 'kd' && state.kin) kdEl.value = sigfig(L.kd, 4);
+    var h = document.querySelector('.dv[data-kv="half"][data-i="' + i + '"]');
+    if (h) h.textContent = dur(Math.LN2 / L.koff);
+  });
+}
+
+var kinCache = null, kgeom = null;
+
+// the series is the same one the equilibrium plot titrates
+function kinData(){
+  if (!cache) return [];
+  return cache.groups.map(function(g){
+    var L = g.L, pt = Math.max(0, num(L.pt, 0));
+    var pts = g.sim.pts.map(function(p){ return kinPoint(pt, p.x, L.kd, L.kon); }).reverse();  // high -> low
+    return { idx: g.idx, name: g.name, L: L, pt: pt, pts: pts };
+  });
+}
+
+// show or hide the kinetics panels; runs before the equilibrium plot is sized,
+// since the association plot takes half its row
+function kinLayout(){ applyLayout(); }
+function applyLayout(){
+  var stage = document.getElementById('stage');
+  if (!stage) return;
+  var lay = state.layout, beside = lay !== 'A', tabbed = state.kin && lay !== 'C';
+  if (!state.kin) state.tab = 'eq';
+  stage.className = 'stage lay-' + lay + (state.kin ? ' kin' : '') + (state.coop ? ' coop' : '') + (tabbed ? ' tabbed' : '');
+  stage.setAttribute('data-tab', tabbed ? state.tab : 'both');
+  var colM = document.getElementById('colM'), colR = document.getElementById('colR'), mrow = document.getElementById('mrow');
+  var mod = document.querySelector('.stage .modpanel'), side = document.querySelector('.stage .side');
+  if (beside){
+    var colL = document.querySelector('.stage .colL');
+    if (mod.parentNode !== colL) colL.appendChild(mod);
+    if (side.parentNode !== colR) colR.appendChild(side);
+  } else {
+    // models to fit: their own panel at the foot of the parameters column
+    var colLm = document.querySelector('.stage .colL');
+    if (mod.parentNode !== colLm) colLm.appendChild(mod);
+    if (side.parentNode !== colM) colM.appendChild(side);
+  }
+  colR.hidden = !beside;
+  // full-width windows: every accordion moves into a column beside the curves
+  // and results; otherwise they stack under them
+  // design notes and About go beside; the rest stays under the panels
+  var accs = document.getElementById('accs'), side2 = document.getElementById('accsR');
+  var dpn = document.getElementById('designPanel'), about = document.getElementById('aboutCard');
+  var notesBeside = !beside && window.innerWidth >= 1500;
+  if (notesBeside){
+    if (side2.parentNode !== colR) colR.appendChild(side2);
+    if (dpn.parentNode !== side2) side2.appendChild(dpn);
+    if (about.parentNode !== side2) side2.appendChild(about);
+    colR.hidden = false;
+  } else if (dpn.parentNode === side2){
+    accs.insertBefore(dpn, accs.firstChild);
+    var notesBox = accs.querySelector('.notes');
+    notesBox.insertBefore(about, notesBox.firstChild);
+  }
+  stage.classList.toggle('notes-beside', notesBeside);
+  document.getElementById('kinAcc').hidden = !state.kin;
+  document.getElementById('kinChart').hidden = !state.kin;
+  document.querySelectorAll('[data-tab]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.getAttribute('data-tab') === state.tab)); });
+  document.querySelectorAll('[data-lay]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.getAttribute('data-lay') === lay)); });
+}
+
+function renderKin(){
+  kinLayout();
+  if (!state.kin){ kinCache = null; return; }
+  kinCache = kinData();
+  drawKin();
+}
+
+// beside the equilibrium curve, the kinetic plot takes the height that makes
+// its panel end level with the equilibrium panel (measured at natural size),
+// but never taller than it is wide by more than a little
+function drawKin(){
+  var box = document.getElementById('kplot');
+  if (!state.kin || !kinCache || !box) return;
+  var kk = document.getElementById('kkey');
+  var avail = box.parentNode.clientWidth;
+  var W = Math.min(window.W_KIN || 1e9, Math.max(260, avail)), narrow = W < 560;
+  // stacked under the equilibrium plot in the same column, so the same height
+  var H = window.H_KIN || 300;
+  // the same frame, y scale and type as the equilibrium plot, so the two
+  // panels line up gridline for gridline when they sit side by side
+  var m = { l: M.l, r: M.r, t: M.t, b: M.b }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  var t1 = state.ta, unitMin = t1 > 1800, ay = m.t + ih;
+  var x = function(t){ return m.l + t / t1 * iw; };
+  var y = function(v){ return m.t + ih - (v - Y0) / (Y1 - Y0) * ih; };
+  kgeom = { x: x, y: y, m: m, iw: iw, ih: ih, t1: t1, W: W, H: H };
+  box.style.width = W + 'px';
+
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="max-width:' + W + 'px;margin-inline:auto" role="img" aria-label="Fraction of protein bound versus time during association, one curve per ligand concentration">';
+  s += '<rect x="' + m.l + '" y="' + m.t + '" width="' + iw + '" height="' + ih + '" fill="var(--assoc)"/>';
+  s += '<text x="' + (m.l + 8) + '" y="' + (m.t + 14) + '" fill="var(--muted)" font-size="11" font-family="var(--sans)" font-weight="600" letter-spacing="0.06em">ASSOCIATION</text>';
+  [0, 0.25, 0.5, 0.75, 1].forEach(function(v){
+    s += '<line x1="' + m.l + '" x2="' + (m.l + iw) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="gridline"/>';
+    s += '<text x="' + (m.l - 12) + '" y="' + (y(v) + 5) + '" text-anchor="end" class="tick">' + v.toFixed(2) + '</text>';
+  });
+  niceTicks(0, t1, narrow ? 4 : 6).forEach(function(v){
+    s += '<line class="gridline" x1="' + x(v) + '" x2="' + x(v) + '" y1="' + m.t + '" y2="' + ay + '"/>';
+    s += '<text x="' + x(v) + '" y="' + (ay + 28) + '" text-anchor="middle" class="tick">' +
+      (unitMin ? +(v / 60).toPrecision(3) : v) + '</text>';
+  });
+  s += '<line class="axisline" x1="' + m.l + '" x2="' + (m.l + iw) + '" y1="' + ay + '" y2="' + ay + '"/>';
+  s += '<line class="axisline" x1="' + m.l + '" x2="' + m.l + '" y1="' + m.t + '" y2="' + ay + '"/>';
+  s += '<text x="' + (m.l + iw / 2) + '" y="' + (H - 8) + '" text-anchor="middle" class="alab">time (' + (unitMin ? 'm' : 's') + ')</text>';
+  s += '<text transform="translate(15 ' + (m.t + ih / 2) + ') rotate(-90)" text-anchor="middle" class="alab">fraction of protein bound</text>';
+
+  var N = 240, ts = [];
+  for (var j = 0; j <= N; j++) ts.push(t1 * j / N);
+  // C under B under A, lowest concentration at the back of each ligand
+  kinCache.slice().reverse().forEach(function(g){
+    var n = g.pts.length;
+    for (var q = n - 1; q >= 0; q--){
+      var P = g.pts[q];
+      var d = ts.map(function(t, k){ return (k ? 'L' : 'M') + x(t).toFixed(1) + ' ' + y(P.f(t)).toFixed(1); }).join('');
+      s += '<path d="' + d + '" fill="none" stroke="' + shade(g.idx, q, n) + '" stroke-width="2" stroke-linejoin="round"/>';
+    }
+  });
+  s += '<g id="khover" visibility="hidden" pointer-events="none"><line id="khl" y1="' + m.t + '" y2="' + (m.t + ih) +
+       '" stroke="var(--ink)" stroke-opacity="0.35"/><g id="khd"></g></g>';
+  s += '<rect id="khit" x="' + m.l + '" y="' + m.t + '" width="' + iw + '" height="' + ih + '" fill="transparent"/>';
+  s += '</svg><div class="tip ktip" id="ktip" hidden></div>';
+  box.innerHTML = s;
+  bindKinHover();
+
+  // key: one ramp per ligand
+  document.getElementById('kkey').innerHTML = kinCache.map(function(g){
+    var n = g.pts.length, ramp = '';
+    for (var q = 0; q < Math.min(n, 8); q++) ramp += '<i style="background:' + shade(g.idx, Math.round(q * (n - 1) / Math.max(1, Math.min(n, 8) - 1)), n) + '"></i>';
+    return '<span class="kk"><span class="ramp">' + ramp + '</span><b>' + esc(g.name) + '</b></span>';
+  }).join('') + (kinCache.length ? '<span class="knote">darkest = highest [L]<sub>T</sub> · true kinetics, no noise</span>' : '<span>Switch on a ligand to simulate its association.</span>');
+}
+
+function bindKinHover(){
+  var box = document.getElementById('kplot'), svg = box.querySelector('svg'), hit = box.querySelector('#khit');
+  var tip = document.getElementById('ktip'), hov = box.querySelector('#khover');
+  var hl = box.querySelector('#khl'), hd = box.querySelector('#khd');
+  var leave = function(){
+    hov.setAttribute('visibility', 'hidden'); tip.hidden = true;
+  };
+  var move = function(ev){
+    var r = svg.getBoundingClientRect(), sc = kgeom.W / r.width;
+    var px = (ev.clientX - r.left) * sc, t = (px - kgeom.m.l) / kgeom.iw * kgeom.t1;
+    if (t < 0 || t > kgeom.t1) return leave();
+    hov.setAttribute('visibility', 'visible');
+    hl.setAttribute('x1', px); hl.setAttribute('x2', px);
+    var dots = '', rows = '';
+    kinCache.forEach(function(g){
+      var n = g.pts.length;
+      if (kinCache.length > 1) rows += '<div class="kta">' + esc(g.name) + '</div>';
+      // only the ends of the series: the fastest and the slowest curve
+      g.pts.forEach(function(P, q){
+        if (q !== 0 && q !== n - 1) return;
+        var v = P.f(t), c = shade(g.idx, q, n);
+        dots += '<circle cx="' + px + '" cy="' + kgeom.y(v) + '" r="3.5" fill="' + c + '" stroke="var(--surface)" stroke-width="1.5"/>';
+        rows += '<div class="kr"><span><i class="ksw" style="background:' + c + '"></i>' + fmt(P.Lt, 3) + ' ' + state.unit +
+          '</span><span>' + v.toFixed(3) + '</span><span>' + (P.feq > 0 ? (v / P.feq).toFixed(3) : '—') + '</span></div>';
+      });
+    });
+    hd.innerHTML = dots;
+    var tl = 't = ' + (t >= 100 ? t.toFixed(0) : t.toFixed(1)) + ' s' + (t >= 120 ? ' (' + dur(t) + ')' : '');
+    tip.innerHTML = '<div class="kt0">' + tl + '</div><div class="kr th"><span>[L]<sub>T</sub></span><span>f<sub>t</sub></span><span>f<sub>t</sub>/f<sub>eq</sub></span></div>' + rows;
+    tip.hidden = false;
+    var cw = box.clientWidth, tw = tip.offsetWidth, cx = ev.clientX - box.getBoundingClientRect().left;
+    tip.style.left = Math.max(0, (cx + 14 + tw > cw ? cx - 14 - tw : cx + 14)) + 'px';
+    tip.style.top = (kgeom.m.t / sc + 6) + 'px';
+  };
+  hit.addEventListener('pointermove', move);
+  hit.addEventListener('pointerdown', move);
+  hit.addEventListener('pointerleave', leave);
+}
+
+// Everything kinetic about one ligand, for the consolidated table: the
+// summary numbers for its row, and the per-concentration table and design
+// notes for the detail row beneath it.
+function kinDetail(g){
+  var L = g.L, Kd = L.kd, u = state.unit, ta = state.ta;
+  var rows = g.pts.map(function(P){
+    var end = P.f(ta);
+    return { P: P, end: end, pct: P.feq > 0 ? 100 * end / P.feq : 0 };
+  });
+  var slow = rows.reduce(function(a, r){ return r.P.t95 > a ? r.P.t95 : a; }, 0);
+  var body = rows.map(function(r){
+    return '<tr><td class="ca">' + fmt(r.P.Lt, 3) + '</td><td>' + dur(r.P.t95) + '</td><td>' + r.P.feq.toFixed(3) + '</td><td>' + r.end.toFixed(3) +
+      '</td><td class="' + (r.pct >= 95 ? 'ok' : 'warn') + '">' + (r.pct >= 99.95 ? '100' : r.pct.toFixed(1)) + '</td></tr>';
+  }).join('');
+  var table = '<div class="tablescroll"><table class="rtab"><thead><tr>' +
+      '<th class="ca"><span class="sym">[L]<sub>T</sub> (' + u + ')</span></th>' +
+      '<th><span class="sym">t<sub>eq</sub> (95%)</span></th>' +
+      '<th><span class="sym">f<sub>eq</sub></span></th>' +
+      '<th><span class="sym">f<sub>end</sub></span></th>' +
+      '<th><span class="sym">f<sub>end</sub>/f<sub>eq</sub> (%)</span></th>' +
+    '</tr></thead><tbody>' + body + '</tbody></table></div>';
+
+  return { slow: slow, table: table,
+           allEq: rows.every(function(r){ return r.pct >= 95; }),
+           anyLow: rows.some(function(r){ return r.pct < 50; }) };
+}
+
+// a ligand named where something needs fixing carries its colour
+function ligTag(idx, name){
+  return '<span class="lgn"><b class="dot" style="background:' + col(idx % 3) + '"></b>' +
+    '<span style="color:' + col(idx % 3) + '">' + esc(name) + '</span></span>';
+}
+
+// Equilibrium design checks, from the true parameters with no noise: does the
+// series reach the top and start near the bottom, does it put enough points
+// through the transition, and is the protein low enough to report the K_d.
+function eqNotes(){
+  var G = cache ? cache.groups : [], u = state.unit, notes = [];
+  if (!G.length) return notes;
+  var many = G.length > 1;
+  var D = G.map(function(g){
+    var L = g.L, pt = Math.max(0, num(L.pt, 0)), kd = num(L.kd, 1), n = hn(L);
+    var f = function(x){ return boundFrac(pt, x, kd, n); };
+    var xs = g.sim.pts.map(function(p){ return p.x; });
+    return { g: g, tag: ligTag(g.idx, g.name), pt: pt, kd: kd, n: n,
+      top: f(g.sim.hi), bot: f(g.sim.lo), lo: g.sim.lo, hi: g.sim.hi,
+      mid: xs.filter(function(x){ var v = f(x); return v > 0.1 && v < 0.9; }).length,
+      // total ligand that brings the protein to 95% / 5% bound
+      hiNeed: kd * Math.pow(19, 1 / n) + 0.95 * n * pt,
+      loNeed: kd * Math.pow(1 / 19, 1 / n) + 0.05 * n * pt };
+  });
+  var pct = function(v){ return Math.round(100 * v) + '%'; };
+  var top = D.filter(function(x){ return x.top < 0.9; });
+  if (top.length) notes.push('<b>The highest concentration is too low.</b> ' + top.map(function(x){
+      return x.tag + ' reaches only ' + pct(x.top) + ' bound at ' + fmt(x.hi, 3) + ' ' + u +
+        '; raise [L]<sub>max</sub> to at least ' + fmt(x.hiNeed, 2) + ' ' + u; }).join('. ') +
+    '. Without the plateau, B<sub>max</sub> and K<sub>d</sub> trade off against each other and the fitted K<sub>d</sub> is poorly defined.');
+  var bot = D.filter(function(x){ return x.bot > 0.1; });
+  if (bot.length) notes.push('<b>The lowest concentration is too high.</b> ' + bot.map(function(x){
+      return x.tag + ' is already ' + pct(x.bot) + ' bound at ' + fmt(x.lo, 3) + ' ' + u +
+        '; lower [L]<sub>min</sub> to about ' + fmt(x.loNeed, 2) + ' ' + u; }).join('. ') +
+    '. A baseline anchors the bottom of the curve.');
+  var tit = D.filter(function(x){ return x.pt > x.kd; });
+  if (tit.length) notes.push('<b>The protein concentration is too high.</b> ' + tit.map(function(x){
+      return x.tag + ' has [P]<sub>T</sub> at ' + sci(x.pt / x.kd) + '× K<sub>d</sub>'; }).join(', ') +
+    '. This is a stoichiometric titration: the curve tracks [P]<sub>T</sub> rather than K<sub>d</sub>, its midpoint sits near K<sub>d</sub> + [P]<sub>T</sub>/2, and even the quadratic fit has little to say about K<sub>d</sub>. Lower [P]<sub>T</sub> toward K<sub>d</sub>/10 if the signal allows.');
+  var dep = D.filter(function(x){ return x.pt > 0.1 * x.kd && x.pt <= x.kd; });
+  if (dep.length) notes.push('<b>Ligand depletion shifts the curve.</b> ' + dep.map(function(x){
+      return x.tag + ' has [P]<sub>T</sub> at ' + sci(x.pt / x.kd) + '× K<sub>d</sub> (midpoint ≈ ' +
+        fmt(x.kd + x.pt / 2, 3) + ' ' + u + ')'; }).join(', ') +
+    '. Fit with the quadratic model, which accounts for bound ligand, or lower [P]<sub>T</sub> below K<sub>d</sub>/10.');
+  var thin = D.filter(function(x){ return x.mid < 4; });
+  if (thin.length) notes.push('<b>Few points through the transition.</b> ' + thin.map(function(x){
+      return x.tag + ' has ' + x.mid + ' point' + (x.mid === 1 ? '' : 's') + ' between 10% and 90% bound'; }).join(', ') +
+    '. Use a smaller dilution factor or more points so the slope is sampled.');
+  var range = D.map(function(x){ return (many ? x.tag + ' runs ' : 'It runs from ') + pct(x.bot) + ' to ' + pct(x.top) + ' bound with ' + x.mid + ' points between 10% and 90%'; }).join('; ');
+  if (!notes.length) notes.push('<b>' + (many ? 'Every titration is' : 'The titration is') + ' well designed' + (state.kin ? ' at equilibrium' : '') + '.</b> ' +
+    range + ', and [P]<sub>T</sub> is low enough that the curve midpoint reports the K<sub>d</sub>.');
+  // with kinetics on, the curve is only an equilibrium measurement if every
+  // point has got there by the read
+  if (state.kin){
+    var kd = kinData(), ta = state.ta;
+    var short = D.map(function(x){
+      var K = kd.filter(function(k){ return k.idx === x.g.idx; })[0];
+      if (!K) return null;
+      var worst = 100, det = kinDetail(K);
+      K.pts.forEach(function(P){ var v = P.feq > 0 ? 100 * P.f(ta) / P.feq : 100; if (v < worst) worst = v; });
+      return worst < 95 ? { x: x, worst: worst, slow: det.slow } : null;
+    }).filter(Boolean);
+    if (short.length) notes.push('<b>The curve is not at equilibrium when read.</b> ' + short.map(function(o){
+        var f = o.x.g.fits.filter(function(m){ return m.model === 'quadratic'; })[0] || o.x.g.fits[0];
+        return o.x.tag + ' reaches only ' + Math.round(o.worst) + '% of equilibrium at its lowest points after ' + dur(ta) +
+          (f ? ', so its fitted K<sub>d</sub> (' + fmt(f.kHalf, 3) + ' ' + u + ') ' +
+            (f.kHalf > 1.2 * o.x.kd ? 'overstates' : 'only roughly matches') + ' the true ' + fmt(o.x.kd, 3) + ' ' + u : '') +
+          '; incubate at least ' + dur(o.slow); }).join('. ') +
+      '. Under-bound low-concentration points push the apparent midpoint to higher [L], so the curve reports a weaker binder than the true one.');
+  }
+  return notes;
+}
+
+function renderDesignNotes(){
+  var host = document.getElementById('designNotes'), panel = document.getElementById('designPanel');
+  if (!host) return;
+  var eq = eqNotes();
+  if (!eq.length){ panel.hidden = true; host.innerHTML = ''; return; }
+  panel.hidden = false;
+  var block = function(title, list){
+    return '<div class="rc-notes dcol"><h4>' + title + '</h4>' + list.map(function(n){ return '<p>' + n + '</p>'; }).join('') + '</div>';
+  };
+  var kd = state.kin ? kinData() : [];
+  var kn = kd.length ? kinNotes(kd) : [];
+  host.innerHTML = block('Equilibrium', eq) + (kn.length ? block('Kinetics · read at ' + dur(state.ta), kn) : '');
+  // the closed accordion still says whether anything needs attention
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|Not every point|Depletion shapes)/;
+  var n = eq.concat(kn).filter(function(t){ return problem.test(t); }).length;
+  document.getElementById('designSub').innerHTML = n
+    ? '<span class="bad">' + n + (n === 1 ? ' issue' : ' issues') + '</span> to review'
+    : '<span class="ok">No issues</span> · the design looks sound';
+}
+
+// The kinetic design notes for every ligand together:
+// each point is made once, naming the ligands it applies to.
+function kinNotes(kd){
+  var ta = state.ta, many = kd.length > 1;
+  var D = kd.map(function(K){ return { K: K, d: kinDetail(K) }; });
+  var who = function(list, fn){
+    return list.map(function(x){ return (many ? tag(x) + ' ' : '') + fn(x); }).join(', ');
+  };
+  // a ligand named where something needs fixing carries its colour
+  var tag = function(x){ return ligTag(x.K.idx, x.K.name); };
+  var slowest = D.reduce(function(a, x){ return !a || x.d.slow > a.d.slow ? x : a; }, null);
+  var short = D.filter(function(x){ return !x.d.allEq; });
+  var notes = [];
+  if (!short.length){
+    notes.push('<b>Every point reaches equilibrium</b> within the ' + dur(ta) + ' association time. The slowest' +
+      (many ? ' (' + tag(slowest) + ')' : '') + ' needs ' + dur(slowest.d.slow) + ', so incubate at least that long before reading.');
+  } else {
+    var low = short.some(function(x){ return x.d.anyLow; });
+    notes.push('<b>Not every point reaches equilibrium</b> after ' + dur(ta) +
+      ' (' + short.map(function(x){ return tag(x) + ' needs ' + dur(x.d.slow); }).join(', ') + ')' +
+      '. The equilibrium curve is read at this time, so the slow, low-concentration points are under-bound' +
+      (low ? ' and the fitted K<sub>d</sub> is biased high' : '') +
+      '. Incubate for at least ' + dur(slowest.d.slow) + '.');
+  }
+  notes.push('<b>The lowest concentrations are slowest.</b> As [L] → 0, t<sub>eq</sub> approaches ln 20 / k<sub>off</sub>' +
+    (many ? ': ' : ' = ') + who(D, function(x){ return dur(Math.log(20) / x.K.L.koff); }) +
+    '. A tighter binder at the same k<sub>on</sub> has a smaller k<sub>off</sub> and needs a longer incubation.');
+  var dep = D.filter(function(x){ return x.K.pt > 0.1 * x.K.L.kd; });
+  if (dep.length) notes.push('<b>Depletion shapes the kinetics</b>' +
+    ' for ' + dep.map(tag).join(', ') +
+    ': [P]<sub>T</sub> is ' + dep.map(function(x){ return sci(x.K.pt / x.K.L.kd); }).join(', ') +
+    '× K<sub>d</sub>, so binding draws down free ligand, the approach is not a single exponential, and k<sub>obs</sub> is not k<sub>on</sub>[L] + k<sub>off</sub>.');
+  return notes;
+}
+
+function kinTSV(){
+  var t1 = state.ta, N = 500, head = ['Time (s)'], cols = [];
+  kinCache.forEach(function(g){
+    g.pts.forEach(function(P){ head.push(g.name + ' ' + sig(P.Lt) + ' ' + state.unit + ' (f)'); cols.push(P); });
+  });
+  var out = head.join('\t') + '\r\n';
+  for (var j = 0; j <= N; j++){
+    var t = +(t1 * j / N).toPrecision(6);
+    out += t + '\t' + cols.map(function(P){ return sig(P.f(t)); }).join('\t') + '\r\n';
+  }
+  return out;
+}
+function kinResultsTSV(){
+  return kinCache.map(kinLigandTSV).join('\r\n');
+}
+function kinLigandTSV(g){
+  var u = state.unit, out = '';
+  [g].forEach(function(g){
+    var L = g.L, slow = 0;
+    g.pts.forEach(function(P){ if (P.t95 > slow) slow = P.t95; });
+    out += g.name + '\tKd ' + sig(L.kd) + ' ' + u + '\tkon ' + sig(L.kon, 4) + ' M-1s-1\tkoff ' + sig(L.koff, 4) +
+      ' s-1\tteq95 ' + dur(slow) + '\tt1/2 ' + dur(Math.LN2 / L.koff) + '\r\n';
+    out += '[L]T (' + u + ')\tteq95 (s)\tf_eq\tf_end\tf_end/f_eq (%)\r\n';
+    g.pts.forEach(function(P){
+      var end = P.f(state.ta);
+      out += [sig(P.Lt, 4), sig(P.t95, 4), P.feq.toFixed(4), end.toFixed(4),
+              (P.feq > 0 ? 100 * end / P.feq : 0).toFixed(1)].join('\t') + '\r\n';
+    });
+  });
+  return out;
+}
+
+// One accordion per ligand under the summary table: its kinetic curve table
+// and design notes. Which ones are open survives a redraw.
+// One accordion below the curves; inside it the ligands sit side by side,
+// each with its curve table and design notes. Open or closed survives redraws.
+(function(){
+  var acc = document.getElementById('kinAcc');
+  acc.addEventListener('toggle', function(){ acc.dataset.keep = acc.open ? '1' : ''; });
+  document.getElementById('kinAccCopy').addEventListener('click', function(ev){
+    ev.preventDefault(); ev.stopPropagation();          // copy, don't toggle
+    var kd = kinData();
+    if (!kd.length){ saidIn('kinAccSaid', 'no ligands switched on'); return; }
+    copyText(kinSideTSV(kd), 'kinAccSaid');
+  });
+})();
+function renderKinAcc(kd){
+  var acc = document.getElementById('kinAcc'), host = document.getElementById('kinCols');
+  if (!acc || !host) return;
+  if (!state.kin || !kd || !kd.length){ host.innerHTML = ''; document.getElementById('kinAccSub').textContent = ''; return; }
+  var slowest = 0;
+  host.innerHTML = kd.map(function(K){
+    var det = kinDetail(K);
+    if (det.slow > slowest) slowest = det.slow;
+    return '<section class="kcol" style="--ac:' + col(K.idx % 3) + '">' +
+      '<h3 class="kcol-h"><span class="nm"><b class="dot" style="background:' + col(K.idx % 3) + '"></b>' + esc(K.name) + '</span>' +
+      '<span class="kacc-sub">slowest t<sub>eq</sub> ' + dur(det.slow) + '</span></h3>' +
+      det.table + '</section>';
+  }).join('');
+  document.getElementById('kinAccSub').innerHTML = kd.length + (kd.length === 1 ? ' ligand' : ' ligands') + ' · ' +
+    kd[0].pts.length + ' concentrations each · slowest t<sub>eq</sub> ' + dur(slowest);
+}
+
+// the ligands side by side, as on screen, a blank column between them
+function kinSideTSV(kd){
+  var u = state.unit, rows = [[], []], n = 0;
+  kd.forEach(function(g, k){
+    var sep = k ? [''] : [];
+    rows[0] = rows[0].concat(sep, [g.name, '', '', '', '']);
+    rows[1] = rows[1].concat(sep, ['[L]T (' + u + ')', 'teq95 (s)', 'f_eq', 'f_end', 'f_end/f_eq (%)']);
+    n = Math.max(n, g.pts.length);
+  });
+  for (var q = 0; q < n; q++){
+    var r = [];
+    kd.forEach(function(g, k){
+      var P = g.pts[q];
+      if (k) r.push('');
+      if (!P){ r.push('', '', '', '', ''); return; }
+      var end = P.f(state.ta);
+      r.push(sig(P.Lt, 4), sig(P.t95, 4), P.feq.toFixed(4), end.toFixed(4), (P.feq > 0 ? 100 * end / P.feq : 0).toFixed(1));
+    });
+    rows.push(r);
+  }
+  return rows.map(function(r){ return r.join('\t'); }).join('\r\n') + '\r\n';
+}
+
+// the summary table exactly as shown, group headings spread over their columns
+function summaryTSV(){
+  var out = [];
+  document.querySelectorAll('#thead tr, #tbody tr').forEach(function(tr){
+    if (tr.classList.contains('ph')) return;
+    var row = [];
+    tr.querySelectorAll('th,td').forEach(function(c){
+      row.push(c.textContent.replace(/\s+/g, ' ').trim());
+      for (var k = 1; k < (c.colSpan || 1); k++) row.push('');
+    });
+    out.push(row.join('\t'));
+  });
+  if (document.querySelector('#thead th[rowspan]') && out.length > 1) out[1] = '\t' + out[1];
+  var G = cache ? cache.groups : [];
+  return out.join('\r\n') + '\r\n';
+}
+
+function saidIn(id, msg){
+  var el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.classList.remove('on'); }, 2600);
+}
+function copyText(text, sayId){
+  var fallback = function(){
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e){ ok = false; }
+    document.body.removeChild(ta);
+    saidIn(sayId, ok ? 'copied' : 'could not copy here');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ saidIn(sayId, 'copied'); }, fallback);
+  } else fallback();
+}
+
+/* ---------------- readouts ---------------- */
+
+// With n pinned at 1 this is the textbook specific binding equation; once n is
+// fitted it is the Hill equation, so it is named for what it actually is.
+// 'cap' for a label or table cell, 'the' for running prose, 'short' for a key
+function specificName(style){
+  var hill = state.fitHill;
+  if (style === 'the')   return hill ? 'the Hill model' : 'specific binding';
+  if (style === 'low')   return hill ? 'Hill model' : 'specific binding';
+  if (style === 'short') return hill ? 'Hill' : 'specific';
+  return hill ? 'Hill model' : 'Specific binding';
+}
+var MODEL_NAME = { quadratic: 'Quadratic 1:1' };
+
+// value with its standard error, the error kept visually subordinate
+// Quote the error to one significant figure and round the value to that same
+// place: nothing is printed more precisely than the fit can support. 493 +- 21
+// becomes 490 +- 20, not 493 +- 21.4. Only genuinely out-of-scale numbers fall
+// back to the exponent form - the unit selector is what keeps the rest legible.
+function pm(v, se){
+  if (se === null || se === undefined || !isFinite(se) || se <= 0) return fmt(v, 3);
+  var seR = parseFloat(Number(se).toPrecision(1));
+  var a = Math.abs(v), e = Math.floor(Math.log10(seR));
+  // out of scale for plain decimals, or an error so small that matching its
+  // place would print a row of zeros - either way, use the exponent form
+  if (!isFinite(seR) || seR <= 0 || a >= 1e6 || (a > 0 && a < 1e-3) || e < -6){
+    return fmt(v, 3) + '<span class="se"> ± ' + fmt(seR, 1) + '</span>';
+  }
+  var step = Math.pow(10, e);                     // place of the error's one digit
+  var vR = Math.round(v / step) * step;
+  var d = Math.min(6, Math.max(0, -e));
+  return vR.toFixed(d) + '<span class="se"> ± ' + seR.toFixed(d) + '</span>';
+}
+
+// Transposed: one column per ligand, one row per quantity, grouped under the
+// simulation and each model. Narrow enough to sit beside the curves.
+function renderResultsT(){
+  var c = cache, u = state.unit, G = c.groups;
+  var thead = document.getElementById('thead'), tbody = document.getElementById('tbody');
+  var kin = state.kin, kd = kin ? kinData() : [];
+  var ncol = 1 + Math.max(1, G.length);
+
+  if (!G.length){
+    thead.innerHTML = '';
+    tbody.innerHTML = '<tr class="end"><td class="msg" colspan="2">Switch on a ligand to simulate an experiment.</td></tr>';
+    renderKinAcc(kd); alignModels();
+    return;
+  }
+
+  thead.innerHTML = '<tr><th class="rl"></th>' + G.map(function(g){
+    return '<th class="lc"><span class="nm"><b class="dot" style="background:' + col(g.idx % 3) + '"></b>' +
+      esc(g.name) + '</span></th>';
+  }).join('') + '</tr>';
+
+  var rows = [];
+  var sec = function(t){ rows.push('<tr class="sec-row"><th colspan="' + ncol + '">' + t + '</th></tr>'); };
+  var line = function(label, cells, title){
+    rows.push('<tr><th class="rl" scope="row"' + (title ? ' title="' + title + '"' : '') + '>' + label + '</th>' +
+      cells.map(function(v){ return '<td>' + v + '</td>'; }).join('') + '</tr>');
+  };
+  var pick = function(g, model){ return g.fits.filter(function(f){ return f.model === model; })[0]; };
+  var each = function(model, fn){ return G.map(function(g){ var f = pick(g, model); return f ? fn(f, g) : '—'; }); };
+
+  var rmseLab = 'RMSE <span class="se">(noise SD ' + sig(state.sd, 3) + ')</span>';
+  var rmseTitle = 'Root-mean-square residual over every replicate point; a correct model lands near the noise SD';
+  sec('Simulation conditions');
+  line('K<sub>d</sub> (' + u + ')', G.map(function(g){ return fmt(num(g.L.kd, NaN), 3); }));
+  if (state.coop) line('Hill n', G.map(function(g){ return String(num(g.L.n, 1)); }));
+  // noise-free: how far up the curve the titration is designed to reach
+  line('f at [L]<sub>max</sub>', G.map(function(g){ return fmt(readAt(g.L, g.sim.hi), 3); }));
+
+  if (state.fitSpecific){
+    sec(specificName('cap'));
+    if (state.fitHill) line('K fit (' + u + '<sup>n</sup>)', each('specific', function(f){ return f.fittedN ? pm(f.K, f.seK) : '—'; }));
+    line('K<sub>d</sub> fit (' + u + ')', each('specific', function(f){ return pm(f.kHalf, f.seHalf); }));
+    if (state.fitHill) line('Hill n', each('specific', function(f){ return pm(f.n, f.seN); }));
+    if (state.bmaxSpec) line('B<sub>max</sub>', each('specific', function(f){ return pm(f.B, f.seB); }));
+    line(rmseLab, each('specific', function(f){ return f.rmse.toFixed(3); }), rmseTitle);
+  }
+  if (state.fitQuadratic){
+    sec('Quadratic 1:1');
+    line('K<sub>d</sub> fit (' + u + ')', each('quadratic', function(f){ return pm(f.kHalf, f.seHalf); }));
+    if (state.fitPt) line('[P]<sub>T</sub> fit (' + u + ')', each('quadratic', function(f){ return f.fittedPt ? pm(f.pt, f.sePt) : '—'; }));
+    if (state.bmaxQuad) line('B<sub>max</sub>', each('quadratic', function(f){ return pm(f.B, f.seB); }));
+    line(rmseLab, each('quadratic', function(f){ return f.rmse.toFixed(3); }), rmseTitle);
+  }
+  if (!state.fitSpecific && !state.fitQuadratic)
+    rows.push('<tr><td class="msg" colspan="' + ncol + '">Choose at least one model to fit. The simulated data are plotted.</td></tr>');
+
+  if (kin){
+    var K = function(g){ return kd.filter(function(k){ return k.idx === g.idx; })[0]; };
+    sec('Kinetics · read at ' + dur(state.ta));
+    line('k<sub>on</sub> (M⁻¹s⁻¹)', G.map(function(g){ return sciPretty(g.L.kon); }));
+    line('k<sub>off</sub> (s⁻¹)', G.map(function(g){ return sciPretty(g.L.koff); }));
+    line('t<sub>eq</sub> (95%)', G.map(function(g){ var k = K(g); return k ? dur(kinDetail(k).slow) : '—'; }),
+      'The slowest point in the series: the minimum incubation');
+    line('t½', G.map(function(g){ return dur(Math.LN2 / g.L.koff); }));
+  }
+  rows[rows.length - 1] = rows[rows.length - 1].replace('<tr>', '<tr class="end">');
+  tbody.innerHTML = rows.join('');
+  renderKinAcc(kd);
+  alignModels();
+}
+
+// beside the equilibrium curve (kinetics on) the table is transposed to fit
+// the narrow column; on its own row it is the wide one-row-per-ligand table
+// the wide table under the curves: if every column will not fit, drop each
+// error under its value and close up the padding before resorting to a scroll
+function fitWide(){
+  var tb = document.querySelector('.colM .side table');
+  if (!tb) return;
+  var box = tb.parentNode;
+  tb.classList.remove('tight');
+  if (box.scrollWidth > box.clientWidth + 1) tb.classList.add('tight');
+}
+function renderResults(){
+  var r = state.layout === 'A' ? renderResultsW() : renderResultsT();
+  renderDesignNotes();
+  // three ligands side by side: each error drops under its value to fit
+  var tb = document.querySelector('.stage .side table');
+  if (tb) tb.classList.toggle('many', !!(cache && cache.groups.length >= 3));
+  fitWide();
+  renderRmse();
+  alignResultCols();
+  return r;
+}
+
+// With kinetics on, size the table's columns so the equilibrium group ends at
+// the gap between the two curves and the kinetics group fills the width under
+// the kinetic curve. Re-run whenever the layout moves.
+function alignResultCols(){}
+
+// Each model's goodness of fit sits with the model itself: one RMSE per
+// ligand, in that ligand's colour, under the model's switches.
+function renderRmse(){ return; }
+function renderRmseOld(){
+  var G = cache ? cache.groups : [];
+  var one = function(id, model, on){
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (!on || !G.length){ el.innerHTML = ''; return; }
+    el.innerHTML = '<span class="rk" title="Root-mean-square residual over every replicate point; a correct model lands near the noise SD">RMSE</span>' +
+      G.map(function(g){
+        var f = g.fits.filter(function(x){ return x.model === model; })[0];
+        return '<span class="rv" title="' + esc(g.name) + '"><b class="dot" style="background:' + col(g.idx % 3) + '"></b>' +
+          (f ? f.rmse.toFixed(3) : '—') + '</span>';
+      }).join('') +
+      '';
+  };
+  one('rmseSpec', 'specific', state.fitSpecific);
+  one('rmseQuad', 'quadratic', state.fitQuadratic);
+  var sdEl = document.getElementById('rmseSd');
+  if (sdEl) sdEl.textContent = G.length && (state.fitSpecific || state.fitQuadratic) ? 'noise SD ' + sig(state.sd, 3) : '';
+}
+function renderResultsW(){
+  var c = cache, u = state.unit, body = [];
+  var thead = document.getElementById('thead'), tbody = document.getElementById('tbody');
+  var nlig = state.ligands.length;
+  // reserved-but-unpainted rows, so every state is the same height
+  var pad = function(n, cols){
+    // same cell shape as a real row, so a reserved row is exactly as tall
+    var one = '<tr class="ph"><td><span class="nm"><b class="dot"></b>x</span></td>' +
+      '<td colspan="' + (cols - 1) + '">x</td></tr>';
+    var s = '';
+    return s;
+  };
+  var msg = function(text, cols){
+    return '<tr class="end"><td colspan="' + cols + '" style="color:var(--muted);' +
+      'font-family:var(--sans)">' + text + '</td></tr>' + pad(nlig - 1, cols);
+  };
+
+  if (!state.fitSpecific && !state.fitQuadratic){
+    // no columns to name, so the header is reserved blank rather than dropped
+    thead.innerHTML = '<tr class="ph"><th rowspan="2">Ligand</th>' +
+      '<th class="grpth" colspan="2">x</th><th class="grpth gl">x</th></tr>' +
+      '<tr class="ph"><th>K<sub>d</sub> (' + u + ')</th>' +
+      '<th>f at [L]<sub>max</sub></th><th class="gl">K<sub>d</sub> fit (' + u + ')</th></tr>';
+    tbody.innerHTML = msg('Choose at least one model to fit. The simulated data are plotted above.', 3);
+    renderKinAcc(state.kin ? kinData() : []);
+    alignModels();
+    return;
+  }
+
+  // Each selected model contributes a group of columns, so one ligand is one
+  // row. Hill n only earns a column while it is being fitted - pinned at 1 it
+  // would repeat down the whole table, and the control already says so.
+  // Units run inline so the column labels stay one line tall: the model name
+  // above them is the extra row, and the header ends up no deeper than before.
+  var showHalf = state.fitSpecific && state.fitHill;
+  var rmseH = '<span title="Root-mean-square residual over every replicate point; a correct model lands near the noise SD (' +
+    sig(state.sd, 3) + ')">RMSE</span>';
+  var specCols = (showHalf ? ['K fit (' + u + '<sup>n</sup>)'] : [])
+    .concat(['K<sub>d</sub> fit (' + u + ')'], showHalf ? ['Hill n'] : [],
+            state.bmaxSpec ? ['B<sub>max</sub>'] : [], [rmseH]);
+  var quadCols = ['K<sub>d</sub> fit (' + u + ')']
+    .concat(state.fitPt ? ['[P]<sub>T</sub> fit (' + u + ')'] : [], state.bmaxQuad ? ['B<sub>max</sub>'] : [], [rmseH]);
+
+  var kin = state.kin, kd = kin ? kinData() : [];
+  document.getElementById('resSub').textContent = kin ? '· read at ' + dur(state.ta) : '';
+  var h1 = '<tr><th rowspan="2">Ligand</th>' +
+           '<th class="grpth" colspan="' + (2 + (kin ? 3 : 0) + (state.coop ? 1 : 0)) + '">Simulation conditions</th>',
+      h2 = '<tr><th>K<sub>d</sub> (' + u + ')</th>' + (state.coop ? '<th>Hill n</th>' : '') +
+           '<th>f at [L]<sub>max</sub></th>' +
+           (kin ? '<th><span class="sym">k<sub>on</sub> (M⁻¹s⁻¹)</span></th><th><span class="sym">k<sub>off</sub> (s⁻¹)</span></th><th><span class="sym">t½</span></th>' : '');
+  if (state.fitSpecific){
+    h1 += '<th class="grpth gl" data-grp="specific" colspan="' + specCols.length + '">' +
+      specificName('cap') + '</th>';
+    specCols.forEach(function(t, i){ h2 += '<th' + (i === 0 ? ' class="gl"' : '') + '>' + t + '</th>'; });
+  }
+  if (state.fitQuadratic){
+    h1 += '<th class="grpth gl" data-grp="quadratic" colspan="' + quadCols.length + '">Quadratic 1:1</th>';
+    quadCols.forEach(function(t, i){ h2 += '<th' + (i === 0 ? ' class="gl"' : '') + '>' + t + '</th>'; });
+  }
+  // with kinetics on: how long equilibrium takes, and how far the top and
+  // bottom of the series have got by the time the plate is read
+  var kinCols = ['t<sub>eq</sub> (95%)', 'f/f<sub>eq</sub> [L]<sub>max</sub>', 'f/f<sub>eq</sub> [L]<sub>min</sub>'];
+  if (kin){
+    h1 += '<th class="grpth gl" colspan="' + kinCols.length + '"><a href="#kinAcc" class="tolink" title="Open the kinetics results for every concentration">Steady-state</a></th>';
+    kinCols.forEach(function(t, i){ h2 += '<th' + (i === 0 ? ' class="gl"' : '') + '><span class="sym">' + t + '</span></th>'; });
+  }
+  thead.innerHTML = h1 + '</tr>' + h2 + '</tr>';
+  var ncol = 3 + (kin ? 3 : 0) + (state.coop ? 1 : 0) + (state.fitSpecific ? specCols.length : 0) +
+                 (state.fitQuadratic ? quadCols.length : 0) + (kin ? kinCols.length : 0);
+
+  if (!c.groups.length){
+    tbody.innerHTML = msg('Switch on a ligand to simulate an experiment.', ncol);
+    renderKinAcc(kd);
+    alignModels();
+    return;
+  }
+
+  c.groups.forEach(function(g){
+    var pick = function(model){
+      return g.fits.filter(function(f){ return f.model === model; })[0];
+    };
+    // Noise-free, like the K_d and EC50 beside it: the occupancy the true
+    // parameters give at the top of the titration. It answers a design
+    // question - does this titration reach saturation - so it should not
+    // wander with the noise.
+    var fTop = readAt(g.L, g.sim.hi);
+    var rows = '<tr><td><span class="nm"><b class="dot" style="background:' + col(g.idx % 3) +
+      '"></b>' + esc(g.name) + '</span></td>' +
+      '<td>' + fmt(num(g.L.kd, NaN), 3) + '</td>' +
+      (state.coop ? '<td>' + num(g.L.n, 1) + '</td>' : '') +
+      // coloured by the same test as the design notes: the true equilibrium
+      // occupancy at [L]max should reach 90%
+      (function(){
+        var fEqTop = boundFrac(Math.max(0, num(g.L.pt, 0)), g.sim.hi, g.L.kd, hn(g.L)), good = fEqTop >= 0.9;
+        return '<td class="' + (good ? 'ok' : 'warn') + '" title="' + (good ? 'Reaches the plateau' :
+          'Too low: the titration stops short of the plateau (see the design notes)') + '">' + fmt(fTop, 3) + '</td>';
+      })() +
+      (kin ? '<td>' + sciPretty(g.L.kon) + '</td><td>' + sciPretty(g.L.koff) + '</td><td>' + dur(Math.LN2 / g.L.koff) + '</td>' : '');
+    var sp = pick('specific');
+    if (state.fitSpecific && sp){
+      if (showHalf) rows += '<td class="gl">' + (sp.fittedN ? pm(sp.K, sp.seK) : '\u2014') + '</td>';
+      rows += '<td' + (showHalf ? '' : ' class="gl"') + '>' + pm(sp.kHalf, sp.seHalf) + '</td>';
+      if (showHalf) rows += '<td>' + pm(sp.n, sp.seN) + '</td>';
+      if (state.bmaxSpec) rows += '<td>' + pm(sp.B, sp.seB) + '</td>';
+      rows += '<td>' + sp.rmse.toFixed(3) + '</td>';
+    }
+    var qd = pick('quadratic');
+    if (state.fitQuadratic && qd){
+      rows += '<td class="gl">' + pm(qd.kHalf, qd.seHalf) + '</td>';
+      if (state.fitPt) rows += '<td>' + (qd.fittedPt ? pm(qd.pt, qd.sePt) : '\u2014') + '</td>';
+      if (state.bmaxQuad) rows += '<td>' + pm(qd.B, qd.seB) + '</td>';
+      rows += '<td>' + qd.rmse.toFixed(3) + '</td>';
+    }
+    var K = kin ? kd.filter(function(k){ return k.idx === g.idx; })[0] : null;
+    if (K){
+      var det = kinDetail(K);
+      var pc = function(P){
+        var v = P.feq > 0 ? 100 * P.f(state.ta) / P.feq : 0;
+        return '<td class="' + (v >= 95 ? 'ok' : 'warn') + '">' + (v >= 99.95 ? '100' : v.toFixed(1)) + '%</td>';
+      };
+      rows += '<td class="gl" title="The slowest point in the series: the minimum incubation">' + dur(det.slow) + '</td>' +
+        pc(K.pts[0]) + pc(K.pts[K.pts.length - 1]);
+    }
+    body.push(rows + '</tr>');
+  });
+  body[body.length - 1] = body[body.length - 1].replace('<tr>', '<tr class="end">');
+  tbody.innerHTML = body.join('') + pad(nlig - body.length, ncol);
+  renderKinAcc(kd);
+  alignModels();
+}
+
+// The model row is fixed - both controls always sit in the same place. This
+// only dims the one whose model is switched off.
+function alignModels(){
+  var row = document.getElementById('modelsRow');
+  if (!row) return;
+  var slots = row.querySelectorAll('.mslot');
+  slots[0].classList.toggle('off', !state.fitSpecific);
+  slots[1].classList.toggle('off', !state.fitQuadratic);
+}
+
+function renderChrome(){
+  var key = document.getElementById('keyline');
+
+  key.innerHTML =
+    '<i><span class="dotmark"></span>mean ± SD</i>' +
+    (state.fitQuadratic ? '<i><span class="glyph dash"></span>quadratic fit</i>' : '') +
+    (state.fitSpecific ? '<i><span class="glyph"></span>' + specificName('short') + ' fit</i>' : '') +
+    (state.fitQuadratic ? '<i><span>▲ K<sub>d</sub>, quadratic</span></i>' : '') +
+    (state.fitSpecific ? '<i><span>△ K<sub>d</sub>, ' + specificName('short') + '</span></i>' : '') +
+    (state.kin ? '<i><span class="glyph true"></span>true equilibrium</i>' : '');
+
+  document.getElementById('legend').innerHTML = state.ligands.map(function(L, i){
+    var on = cache.groups.some(function(g){ return g.idx === i; });
+    return '<span class="lgi' + (on ? '' : ' ph') + '"><b class="dot" style="background:' +
+      col(i % 3) + '"></b>' + esc(L.name) + '</span>';
+  }).join('');
+
+  document.getElementById('mSpecificName').firstChild.nodeValue = specificName('cap') + ' ';
+  document.getElementById('mSpecific').checked = state.fitSpecific;
+  document.getElementById('mQuadratic').checked = state.fitQuadratic;
+  document.getElementById('bmaxSpecFit').checked = !!state.bmaxSpec;
+  document.getElementById('bmaxQuadFit').checked = !!state.bmaxQuad;
+  document.getElementById('bmaxSpecFit').parentNode.classList.toggle('off', !state.fitSpecific);
+  document.getElementById('bmaxQuadFit').parentNode.classList.toggle('off', !state.fitQuadratic);
+  document.getElementById('ptFit').checked = !!state.fitPt;
+  document.getElementById('nFit').checked = !!state.fitHill;
+  document.getElementById('nFit').parentNode.classList.toggle('off', !state.fitSpecific);
+  document.getElementById('ptFit').parentNode.classList.toggle('off', !state.fitQuadratic);
+  document.getElementById('scaleLog').setAttribute('aria-pressed', String(state.scale === 'log'));
+  document.getElementById('scaleLin').setAttribute('aria-pressed', String(state.scale !== 'log'));
+}
+
+/* ---------------- rail ---------------- */
+
+function renderScenarios(){
+  var sel = document.getElementById('scnSel');
+  sel.innerHTML = SCENARIOS.map(function(sc){
+    return '<option value="' + sc.key + '">' + esc(sc.title) + '</option>';
+  }).join('') + '<option value="custom" disabled>Custom settings</option>';
+  sel.addEventListener('change', function(){
+    var sc = SCENARIOS.filter(function(x){ return x.key === sel.value; })[0];
+    if (!sc) return;
+    var keepK = state.ligands.map(function(L){ return { kon:L.kon, koff:L.koff, kcalc:L.kcalc }; });
+    state.points = 14;          // the bench default; a scenario may set its own
+    state.coop = false;
+    sc.apply();
+    // scenarios set the equilibrium experiment; the rate constants carry over
+    // unless the scenario is about the kinetics itself
+    if (!(sc.sets && sc.sets.rates))
+      state.ligands.forEach(function(L, i){ L.kon = keepK[i].kon; L.koff = keepK[i].koff; L.kcalc = keepK[i].kcalc === 'kd' ? 'off' : keepK[i].kcalc; });
+    state.preset = sc.key;
+    reseed();
+    renderAll();
+  });
+}
+function syncScenario(){
+  var sc = SCENARIOS.filter(function(x){ return x.key === state.preset; })[0];
+  document.getElementById('scnSel').value = sc ? sc.key : 'custom';
+  document.getElementById('scnDesc').textContent = sc ? sc.blurb : 'Your own settings';
+}
+
+// A log-spaced series of np points from lo to hi steps by a constant factor:
+// d^(np-1) = hi/lo. So the lowest point and the fold dilution are two ways of
+// saying the same thing, and either one gives the other.
+function steps(){ return Math.max(1, clampInt(state.points, NPTS_MIN, NPTS_MAX, 12) - 1); }
+
+function dilutionOf(L){
+  var lo = Math.max(num(L.min, 0), 1e-12), hi = Math.max(num(L.max, lo), lo);
+  if (hi <= lo) return 1;
+  return Math.pow(hi / lo, 1 / steps());
+}
+// With the dilution entered, it is the fixed quantity: kept on the ligand so
+// that editing [L]max or the number of points moves [L]min, never the
+// dilution itself (and rounding can never make it drift)
+function dilOf(L){
+  return (state.lowMode === 'dilution' && L.dil > 1) ? L.dil : dilutionOf(L);
+}
+function minFromDilution(L, d){
+  var hi = Math.max(num(L.max, 1), 1e-12);
+  if (!isFinite(d) || d <= 1) return hi;
+  // rounded to the precision the panel shows, so the typed field and the
+  // derived cell never disagree about the same number
+  return parseFloat((hi / Math.pow(d, steps())).toPrecision(4));
+}
+
+// Four significant figures, and out at the extremes an exponent rather than a
+// run of zeros, so a derived value always fits the cell it is shown in.
+function compact(v){
+  if (!isFinite(v)) return '';
+  var a = Math.abs(v);
+  if (a !== 0 && (a < 1e-3 || a >= 1e5)) return Number(v).toExponential(2).replace('e+', 'e');
+  return sigfig(v, 4);
+}
+
+// A read-only partner to fieldRow: the other way of saying what the user typed.
+// a small dot after a label: filled when the value is calculated, hollow when
+// it is entered (click it to calculate that one instead)
+function lowDot(i, f){
+  var calc = (f === 'min') === (state.lowMode === 'dilution');
+  return '<button type="button" class="calcdot ldot" data-lm="' + (f === 'min' ? 'dilution' : 'min') + '" aria-pressed="' + calc +
+    '" title="' + (calc ? 'Calculated from the other end of the series' : 'Calculate this from the other end of the series') + '"></button>';
+}
+function derivedRow(i, f, label, value, title, dot){
+  return '<div class="derived">' + (dot ? '<div class="kl"><label>' + label + '</label>' + dot + '</div>' : '<label>' + label + '</label>') +
+    '<div class="dv" data-dv="' + f + '" data-i="' + i + '" title="' + title + '">' +
+    value + '</div></div>';
+}
+
+function fieldRow(i, f, label, attrs, dot){
+  return '<div>' + (dot ? '<div class="kl"><label for="' + f + i + '">' + label + '</label>' + dot + '</div>' : '<label for="' + f + i + '">' + label + '</label>') +
+    '<input type="number" id="' + f + i + '" data-f="' + f + '" data-i="' + i + '" ' + attrs + '></div>';
+}
+
+function renderLigands(){
+  var host = document.getElementById('ligands');
+  host.innerHTML = state.ligands.map(function(L, i){
+    var head = '<div class="lig-head">' +
+      '<span class="dot" style="background:' + col(i) + '"></span>' +
+      '<input type="text" data-f="name" data-i="' + i + '" value="' + esc(L.name) + '" aria-label="Ligand name">' +
+      (i > 0
+        ? '<button class="cpy" data-cp="' + i + '" title="Copy every variable from ' + esc(state.ligands[0].name) +
+          '">Copy A</button>'
+        : '') +
+      '<span class="repfield"><label for="reps' + i + '">Reps</label>' +
+        '<input type="number" id="reps' + i + '" data-f="reps" data-i="' + i + '" value="' + L.reps +
+        '" min="1" max="12" step="1"></span>' +
+      '<label class="sw"><input type="checkbox" data-f="on" data-i="' + i + '"' + (L.on ? ' checked' : '') +
+        ' aria-label="Include ' + esc(L.name) + '"><span></span></label></div>';
+    var dil = state.lowMode === 'dilution';
+    var body = '<div class="grid6 ' + (dil ? 'ld' : 'lm') + '">' +
+        fieldRow(i, 'pt', '[P]<sub>T</sub>', 'value="' + L.pt + '" min="0" step="any"') +
+        (dil
+          ? fieldRow(i, 'dil', 'dilution', 'value="' + sigfig(dilOf(L), 4) +
+              '" min="1.001" step="any"', lowDot(i, 'dil'))
+          : derivedRow(i, 'dil', 'dilution', compact(dilutionOf(L)),
+              'Fold step between neighbouring points, set by [L]min, [L]max ' +
+              'and the number of points', lowDot(i, 'dil'))) +
+        (dil
+          ? derivedRow(i, 'min', '[L]<sub>min</sub>', compact(L.min),
+              'Lowest concentration in the series, set by the fold dilution, ' +
+              '[L]max and the number of points', lowDot(i, 'min'))
+          : fieldRow(i, 'min', '[L]<sub>min</sub>', 'value="' + L.min + '" min="0" step="any"', lowDot(i, 'min'))) +
+        fieldRow(i, 'max', '[L]<sub>max</sub>', 'value="' + L.max + '" min="0" step="any"') +
+      '</div>' +
+      // the binding constant sits under [P]T, with the rate constants or the
+      // Hill coefficient beside it when either extension is on
+      '<div class="kgrid l3 ' + (dil ? 'ld' : 'lm') + '">' +
+        (function(){
+          if (!state.kin) return fieldRow(i, 'kd', 'K<sub>d</sub> (' + state.unit + ')', 'value="' + L.kd + '" min="0" step="any"');
+          // with kinetics on, any one of Kd, kon and koff can be the calculated one
+          var calc = L.kcalc === 'kd';
+          var dot = '<button type="button" class="calcdot" data-kc="kd" data-i="' + i + '" aria-pressed="' + calc +
+            '" title="' + (calc ? 'Calculated from koff / kon' : 'Calculate this from koff / kon') + '"></button>';
+          return calc
+            ? '<div><div class="kl"><label for="kd' + i + '">K<sub>d</sub> (' + state.unit + ')</label>' + dot + '</div>' +
+              '<input type="text" class="calc" readonly tabindex="-1" id="kd' + i + '" data-i="' + i + '" value="' + sigfig(L.kd, 4) + '"></div>'
+            : fieldRow(i, 'kd', 'K<sub>d</sub> (' + state.unit + ')', 'value="' + L.kd + '" min="0" step="any"', dot);
+        })() +
+        (state.kin ? kinRowHtml(L, i) : '') +
+        (state.coop ? fieldRow(i, 'n', 'Hill n', 'value="' + L.n + '" min="0.2" max="6" step="0.1"') : '') +
+      '</div>';
+    return '<div class="lig ' + (L.on ? 'on' : 'off') + '">' + head + body + '</div>';
+  }).join('');
+
+  host.querySelectorAll('.ldot').forEach(function(btn){
+    btn.addEventListener('click', function(){ setLowMode(btn.getAttribute('data-lm')); });
+  });
+  host.querySelectorAll('.calcdot[data-kc]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      state.ligands[+btn.getAttribute('data-i')].kcalc = btn.getAttribute('data-kc');
+      renderAll();
+    });
+  });
+
+  host.querySelectorAll('.cpy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var i = +btn.getAttribute('data-cp'), A = state.ligands[0], L = state.ligands[i];
+      ['pt','kd','n','min','max','dil','reps','kon','koff','kcalc'].forEach(function(f){ L[f] = A[f]; });
+      touched();
+      reseed();
+      renderAll();
+    });
+  });
+
+  host.querySelectorAll('.kgrid input').forEach(function(el){
+    el.addEventListener('blur', function(){ syncKinFields(true); });
+  });
+
+  host.querySelectorAll('input').forEach(function(el){
+    el.addEventListener('input', function(){
+      var i = +el.getAttribute('data-i'), f = el.getAttribute('data-f'), L = state.ligands[i];
+      if (f === 'on'){ L.on = el.checked; reseed(); renderAll(); return; }
+      if (f === 'name'){ L.name = el.value || ('Ligand ' + 'ABC'[i]); redraw(); return; }
+      if (f === 'kon' || f === 'koff'){
+        // rate constants change the kinetics only: the equilibrium data stay put
+        var k = parseSci(el.value);
+        if (!isFinite(k) || k <= 0) return;      // let them keep typing
+        L[f] = k;
+        syncK(L); reseed(); redraw();
+        return;
+      }
+      if (f === 'dil'){
+        var d = parseFloat(el.value);
+        if (!isFinite(d) || d <= 1) return;     // let them keep typing
+        L.dil = d;
+        L.min = minFromDilution(L, d);
+        touched(); reseed(); syncDerived(); redraw();
+        return;
+      }
+      if (f === 'n') L.n = Math.max(0.2, Math.min(6, parseFloat(el.value) || 1));
+      else if (f === 'reps') L.reps = Math.max(1, Math.min(12, Math.round(parseFloat(el.value) || 1)));
+      else if (f === 'max' && state.lowMode === 'dilution'){
+        // the dilution is what was entered: hold it and move [L]min instead
+        var d0 = dilOf(L);
+        L.max = parseFloat(el.value);
+        if (isFinite(L.max) && L.max > 0){ L.dil = d0; L.min = minFromDilution(L, d0); }
+      }
+      else L[f] = parseFloat(el.value);
+      touched();
+      reseed();
+      syncDerived();
+      redraw();
+    });
+  });
+}
+
+// [L]min, [L]max and the number of points fix the fold dilution, so editing any
+// of them moves the derived cell. Rewriting just that cell leaves the field the
+// user is typing in - and its cursor - alone.
+function syncDerived(){
+  document.querySelectorAll('.lig .dv').forEach(function(el){
+    var L = state.ligands[+el.getAttribute('data-i')];
+    if (!L) return;
+    el.textContent = el.getAttribute('data-dv') === 'dil'
+      ? compact(dilutionOf(L)) : compact(L.min);
+  });
+}
+
+// Called when a value a scenario defines is edited: the preset no longer
+// describes what is on screen, so it is released. Showing or hiding a ligand
+// and renaming one are deliberately not routed here.
+function touched(){
+  if (state.preset === null) return;
+  state.preset = null;
+  syncScenario();
+}
+
+/* ---------------- render ---------------- */
+
+function redraw(){
+  state.ligands.forEach(syncK);
+  kinLayout();
+  build();
+  renderChrome();
+  renderResults();
+  // last: the plot sizes itself against the results band, which has just been
+  // rebuilt and may have changed height
+  draw();
+  syncKinFields();
+  renderKin();
+  // the kinetic key and the results have now been drawn; one more pass settles
+  if (state.kin){ draw(); drawKin(); }
+}
+function renderAll(){
+  renderLigands();
+  syncScenario();
+  document.getElementById('unit').value = state.unit;
+  document.getElementById('npts').value = state.points;
+  document.getElementById('noisesd').value = state.sd;
+  document.getElementById('kinOn').checked = state.kin;
+  document.getElementById('kinTa').value = state.ta;
+  document.getElementById('kinRow').classList.toggle('off', !state.kin);
+  document.getElementById('coopOn').checked = state.coop;
+  document.getElementById('coopRow').classList.toggle('off', !state.coop);
+  redraw();
+}
+
+/* ---------------- events ---------------- */
+
+document.getElementById('mSpecific').addEventListener('change', function(){
+  state.fitSpecific = this.checked; touched(); redraw();
+});
+document.getElementById('mQuadratic').addEventListener('change', function(){
+  state.fitQuadratic = this.checked; touched(); redraw();
+});
+document.getElementById('nFit').addEventListener('change', function(){
+  state.fitHill = this.checked; touched(); redraw();
+});
+document.getElementById('ptFit').addEventListener('change', function(){
+  state.fitPt = this.checked; touched(); redraw();
+});
+document.getElementById('bmaxSpecFit').addEventListener('change', function(){
+  state.bmaxSpec = this.checked; touched(); redraw();
+});
+document.getElementById('bmaxQuadFit').addEventListener('change', function(){
+  state.bmaxQuad = this.checked; touched(); redraw();
+});
+document.getElementById('unit').addEventListener('change', function(){
+  state.unit = this.value; touched(); renderAll();
+});
+document.getElementById('npts').addEventListener('input', function(){
+  // let the box be briefly empty or out of range while typing; only commit
+  // a clean integer, and snap the field back on blur
+  var n = clampInt(parseFloat(this.value), NPTS_MIN, NPTS_MAX, NaN);
+  if (!isFinite(n) || n !== Math.round(parseFloat(this.value))) return;
+  setPoints(n);
+});
+document.getElementById('npts').addEventListener('blur', function(){
+  var n = clampInt(parseFloat(this.value), NPTS_MIN, NPTS_MAX, state.points);
+  this.value = n;
+  if (n === state.points) return;
+  setPoints(n);
+});
+document.getElementById('coopOn').addEventListener('change', function(){
+  state.coop = this.checked;
+  // one extension at a time: cooperativity and kinetics are exclusive
+  // the quadratic model has no Hill slope, so cooperativity fits the Hill
+  // model alone; switching it off brings the quadratic back
+  if (state.coop){ state.kin = false; state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = true; }
+  else { state.fitHill = false; state.fitQuadratic = true; }
+  touched(); reseed();
+  renderAll();
+});
+document.getElementById('kinOn').addEventListener('change', function(){
+  state.kin = this.checked;
+  if (state.kin && state.coop){ state.coop = false; state.fitHill = false; touched(); reseed(); }
+  // kinetics fits the specific-binding model alone; switching it off brings
+  // the quadratic back
+  state.fitQuadratic = !state.kin;
+  if (state.kin) state.fitSpecific = true;
+  state.tab = state.kin ? 'kin' : 'eq';
+  renderAll();
+});
+document.getElementById('kinTa').addEventListener('input', function(){
+  var v = parseFloat(this.value);
+  if (!isFinite(v) || v <= 0) return;
+  state.ta = v;
+  reseed(); redraw();
+});
+document.getElementById('kinTa').addEventListener('blur', function(){ this.value = state.ta; });
+document.getElementById('kinCopy').addEventListener('click', function(){
+  if (!kinCache || !kinCache.length){ saidIn('kinSaid', 'no ligands switched on'); return; }
+  copyText(kinTSV(), 'kinSaid');
+});
+document.getElementById('kinCopyRes').addEventListener('click', function(){
+  if (!cache || !cache.groups.length){ saidIn('kinResSaid', 'no ligands switched on'); return; }
+  copyText(summaryTSV(), 'kinResSaid');
+});
+
+// One noise level for every ligand. A new SD is a new experiment, so it reseeds.
+document.getElementById('noisesd').addEventListener('input', function(){
+  var v = parseFloat(this.value);
+  if (!isFinite(v) || v < 0) return;      // let them keep typing
+  state.sd = v;
+  touched(); reseed(); redraw();
+});
+document.getElementById('noisesd').addEventListener('blur', function(){
+  this.value = state.sd;
+});
+
+// Repeat the experiment: same settings, a new draw of the noise.
+document.getElementById('resim').addEventListener('click', function(){
+  reseed();
+  redraw();
+  said('resimulated');
+});
+
+// In dilution mode the fold step is what the user set, so changing the number
+// of points moves the bottom of the series rather than the dilution.
+function setPoints(n){
+  var keep = state.lowMode === 'dilution'
+    ? state.ligands.map(function(L){ return dilOf(L); }) : null;
+  state.points = n;
+  if (keep) state.ligands.forEach(function(L, i){ L.dil = keep[i]; L.min = minFromDilution(L, keep[i]); });
+  touched(); reseed();
+  if (keep) renderAll(); else { syncDerived(); redraw(); }
+}
+
+function setLowMode(m){
+  if (state.lowMode === m) return;
+  // entering dilution mode: the current series' dilution becomes the fixed one
+  if (m === 'dilution') state.ligands.forEach(function(L){ L.dil = parseFloat(dilutionOf(L).toPrecision(4)); });
+  state.lowMode = m;
+  renderAll();
+}
+
+document.getElementById('scaleLog').addEventListener('click', function(){ state.scale = 'log'; redraw(); });
+document.getElementById('scaleLin').addEventListener('click', function(){ state.scale = 'linear'; redraw(); });
+
+// ---- export ---------------------------------------------------------------
+// A wide table, laid out the way a spreadsheet wants it: concentration down the
+// first column, then one column per ligand per replicate. Ligands with their
+// own concentration range contribute their own rows, so a cell is blank where
+// that ligand was never measured rather than borrowing a neighbour's point.
+function sig(v, d){
+  if (v === null || v === undefined || !isFinite(v)) return '';
+  if (v === 0) return '0';
+  return String(parseFloat(Number(v).toPrecision(d || 6)));
+}
+
+function dataTable(){
+  var c = cache || build(), u = state.unit;
+  var xs = [], seen = {}, cols = [], head = ['[L]T (' + u + ')'];
+  var key = function(x){ return sig(x, 10); };
+
+  c.groups.forEach(function(g){
+    var reps = Math.max(1, Math.round(num(g.L.reps, 3)));
+    g.sim.pts.forEach(function(P){
+      var k = key(P.x);
+      if (!(k in seen)){ seen[k] = 1; xs.push(P.x); }
+    });
+    for (var r = 0; r < reps; r++){
+      var col = {};
+      g.sim.pts.forEach(function(P, i){
+        var raw = g.sim.raw[i * reps + r];
+        if (raw) col[key(P.x)] = raw.y;
+      });
+      cols.push(col);
+      head.push(reps > 1 ? g.name + ' rep ' + (r + 1) : g.name);
+    }
+  });
+
+  xs.sort(function(a, b){ return a - b; });
+  return [head].concat(xs.map(function(x){
+    var k = key(x);
+    return [sig(x)].concat(cols.map(function(col){
+      return k in col ? sig(col[k]) : '';
+    }));
+  }));
+}
+
+// Tab-separated: that is what lands in a cell grid when pasted.
+function tsv(){
+  return dataTable().map(function(row){
+    return row.map(function(v){ return String(v).replace(/\t/g, ' '); }).join('\t');
+  }).join('\r\n') + '\r\n';
+}
+
+function said(msg){
+  var el = document.getElementById('csvSaid');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(said.t);
+  said.t = setTimeout(function(){ el.classList.remove('on'); }, 2600);
+}
+
+function copyFallback(text){
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e){ ok = false; }
+  document.body.removeChild(ta);
+  said(ok ? 'copied' : 'could not copy here');
+}
+
+document.getElementById('csvCopy').addEventListener('click', function(){
+  if (!cache || !cache.groups.length){ said('no ligands switched on'); return; }
+  var text = tsv();
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ said('copied'); },
+      function(){ copyFallback(text); });
+  } else copyFallback(text);
+});
+
+document.addEventListener('click', function(ev){
+  var t = ev.target.closest && ev.target.closest('[data-tab],[data-lay]');
+  if (!t) return;
+  if (t.hasAttribute('data-tab')){
+    state.tab = t.getAttribute('data-tab');
+    hideTip();
+    applyLayout();
+    return;
+  }
+  state.layout = t.getAttribute('data-lay');
+  redraw();
+});
+
+// "Steady-state" in the results header opens the kinetics results below
+document.addEventListener('click', function(ev){
+  var a = ev.target.closest && ev.target.closest('a.tolink, a.cardlink');
+  if (!a) return;
+  ev.preventDefault();
+  var acc = document.getElementById((a.getAttribute('href') || '#kinAcc').slice(1));
+  if (!acc || acc.hidden) return;
+  acc.open = true;
+  acc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+var resizeTimer = null;
+window.addEventListener('resize', function(){
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function(){ if (cache){ applyLayout(); fitWide(); draw(); alignModels(); drawKin(); alignResultCols(); } }, 120);
+});
+
+var mq = window.matchMedia('(prefers-color-scheme: dark)');
+if (mq.addEventListener) mq.addEventListener('change', function(){ setTimeout(redraw, 30); });
+new MutationObserver(function(){ redraw(); })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+renderScenarios();
+SCENARIOS[0].apply();
+state.preset = SCENARIOS[0].key;
+renderAll();
+// the first pass runs before the grid has settled, so re-size the plot once
+requestAnimationFrame(function(){ if (cache) draw(); });
+})();
+</script>
+
+</body></html>
