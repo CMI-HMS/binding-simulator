@@ -446,6 +446,12 @@ th.gl,td.gl{border-left:1px solid var(--line)}
 .note .nbody > p{max-width:110ch}
 .terms{columns:2 440px;column-gap:44px}
 .terms li{break-inside:avoid}
+/* the categories flow through two columns; each category stays whole */
+#termsCard .termcols{columns:2 440px;column-gap:44px}
+#termsCard .tgroup{break-inside:avoid;margin-bottom:16px}
+#termsCard .tgroup:last-child{margin-bottom:0}
+#termsCard .tgroup .msub{margin-top:0}
+#termsCard .terms{columns:1}
 .split{display:grid;grid-template-columns:minmax(0,1fr);gap:12px 44px}
 @media (min-width:900px){ .split{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .terms li{margin-bottom:6px}
@@ -681,7 +687,7 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
 .stage.notes-beside .accs .dcols .dcol{font-size:12.5px}
 .stage.notes-beside .accs .mcols{grid-template-columns:minmax(0,1fr)}
 .stage.notes-beside .accs .mcols > section + section{margin-top:14px}
-.stage.notes-beside .accs .terms{columns:1}
+.stage.notes-beside .accs .terms,.stage.notes-beside .accs .termcols{columns:1}
 .stage.notes-beside .accs .split{grid-template-columns:minmax(0,1fr)}
 .stage.notes-beside .accs .kcols{grid-template-columns:minmax(0,1fr)}
 .stage.notes-beside .accs details.note > summary,.stage.notes-beside .accs details.kone > summary{padding:10px 14px}
@@ -1057,31 +1063,51 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
     <details class="note wide" id="termsCard">
       <summary><h3>Key terms</h3></summary>
       <div class="nbody">
+      <div class="termcols">
+      <div class="tgroup">
+      <h4 class="msub">Experimental parameters</h4>
       <ul class="terms">
   <li><b>[P]<sub>T</sub></b> — total protein concentration, the same at every point.</li>
   <li><b>[L]<sub>min</sub></b>, <b>[L]<sub>max</sub></b> — first and last total ligand concentrations; points are log-spaced between them.</li>
   <li><b>dilution</b> — the fold step between neighbouring points, d = ([L]<sub>max</sub>/[L]<sub>min</sub>)<sup>1/(points−1)</sup>. Enter either it or [L]<sub>min</sub>; the other follows.</li>
   <li><b>Noise SD</b> — standard deviation of the Gaussian error added to each replicate, in fraction bound. One value is shared by every ligand.</li>
   <li><b>K<sub>d</sub></b> — the true dissociation constant the data were simulated from.</li>
+  <li><b>k<sub>on</sub> (M⁻¹s⁻¹)</b>, <b>k<sub>off</sub> (s⁻¹)</b> — association and dissociation rate constants, tied to the K<sub>d</sub> by K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>. Enter one; the dot marks the one calculated from the other.</li>
+  <li><b>t½</b> — complex half-life, ln 2/k<sub>off</sub>.</li>
+  <li><b>Association time</b> — how long protein and ligand are incubated before the read; <em>in solution</em> unless Dissociation is ticked. Shared by every ligand. The equilibrium curve is read at this time, so a short incubation shows up in the fit.</li>
+  <li><b>Dissociation time</b>, <b>surface-bound (SPR/BLI)</b> — with Dissociation ticked, the simulation becomes a surface binding experiment, such as surface plasmon resonance or biolayer interferometry. The ligand flows over immobilized protein at a fixed concentration, so there is no depletion; after the association time it is replaced by buffer and the bound fraction decays as f<sub>end</sub>·e<sup>−k<sub>off</sub>t</sup>. The equilibrium curve is the response at the end of the association.</li>
+      </ul>
+      </div>
+      <div class="tgroup">
+      <h4 class="msub">Binding concepts</h4>
+      <ul class="terms">
+  <li><b>Cooperativity</b> — how binding at one site changes binding at the next, measured by the Hill coefficient <em>n</em>. At <em>n</em> = 1 sites are independent (or there is only one); <em>n</em> &gt; 1 is positive cooperativity, each binding event making the next easier; <em>n</em> &lt; 1 is negative. <em>n</em> sets the steepness of the curve — 10% to 90% occupancy spans 81<sup>1/n</sup>-fold in free ligand — and is not a count of sites or a stoichiometry.</li>
+  <li><b>Steady-state</b> — the plateau the association reaches once binding and unbinding balance; for simple 1:1 binding it is the equilibrium the curve is meant to measure. Points read before they get there are pre-steady-state and under-report binding. In the results table, the Steady-state columns give the time to reach it (t<sub>eq</sub>) and how close the top and bottom of the series are at the read (f/f<sub>eq</sub> at [L]<sub>max</sub> and [L]<sub>min</sub>).</li>
+      </ul>
+      </div>
+      <div class="tgroup">
+      <h4 class="msub">Results table</h4>
+      <ul class="terms">
   <li><b>f at [L]<sub>max</sub></b> — the true fraction bound at the top of the titration: how far up the curve the experiment is designed to reach.</li>
   <li><b>K<sub>d</sub> fit</b> — the dissociation constant the model returns.</li>
   <li><b>K fit</b> — the Hill model's raw constant, in concentration<sup>n</sup>; shown only while <em>n</em> is fitted, when its K<sub>d</sub> is K<sup>1/n</sup>.</li>
   <li><b>Hill n</b> — the cooperativity the fit recovered.</li>
-  <li><b>Cooperativity</b> — how binding at one site changes binding at the next, measured by the Hill coefficient <em>n</em>. At <em>n</em> = 1 sites are independent (or there is only one); <em>n</em> &gt; 1 is positive cooperativity, each binding event making the next easier; <em>n</em> &lt; 1 is negative. <em>n</em> sets the steepness of the curve — 10% to 90% occupancy spans 81<sup>1/n</sup>-fold in free ligand — and is not a count of sites or a stoichiometry.</li>
   <li><b>[P]<sub>T</sub> fit</b> — the protein concentration the quadratic model returns when it is fitted rather than fixed. Useful when the active concentration is uncertain; it is only well defined when [P]<sub>T</sub> is near or above K<sub>d</sub>, where depletion shapes the curve, and shows as <em>n.d.</em> (not determined) when the data cannot pin it down. It is in the same unit as everything else.</li>
   <li><b>B<sub>max</sub></b> — the plateau the fitted curve rises to. Hold at 1 for a normalised readout; fit it when the curve may not get there.</li>
   <li><b>±</b> — asymptotic standard error: how tightly <em>this</em> dataset pins the value. A wrong model can fit precisely.</li>
   <li><b>RMSE</b> — root-mean-square residual over every replicate point. A correct model lands near the noise SD.</li>
-  <li><b>k<sub>on</sub> (M⁻¹s⁻¹)</b>, <b>k<sub>off</sub> (s⁻¹)</b> — association and dissociation rate constants, tied to the K<sub>d</sub> by K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>. Enter one; the dot marks the one calculated from the other.</li>
-  <li><b>Association time</b> — how long protein and ligand are incubated before the read; <em>in solution</em> unless Dissociation is ticked. Shared by every ligand. The equilibrium curve is read at this time, so a short incubation shows up in the fit.</li>
+      </ul>
+      </div>
+      <div class="tgroup">
+      <h4 class="msub">Steady-State Results</h4>
+      <ul class="terms">
   <li><b>k<sub>obs</sub> (s⁻¹)</b> — the rate of approach to equilibrium, k<sub>on</sub>·√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>). Without depletion this is k<sub>on</sub>[L] + k<sub>off</sub>.</li>
-  <li><b>Steady-state</b> — the plateau the association reaches once binding and unbinding balance; for simple 1:1 binding it is the equilibrium the curve is meant to measure. Points read before they get there are pre-steady-state and under-report binding. In the results table, the Steady-state columns give the time to reach it (t<sub>eq</sub>) and how close the top and bottom of the series are at the read (f/f<sub>eq</sub> at [L]<sub>max</sub> and [L]<sub>min</sub>).</li>
   <li><b>t<sub>eq</sub> (95%)</b> — time to reach 95% of the equilibrium fraction bound; ≈ ln 20 / k<sub>obs</sub>. The ligand's row gives the slowest point in the series: the minimum incubation time.</li>
   <li><b>f<sub>eq</sub>, f<sub>end</sub></b> — fraction of protein bound at equilibrium, and at the end of the association time.</li>
   <li><b>f/f<sub>eq</sub> (%)</b> — how close a point got to equilibrium by the read (f<sub>end</sub>/f<sub>eq</sub> in the Steady-State Results). Under 95%, shown in red, means that point is still rising when read.</li>
-  <li><b>t½</b> — complex half-life, ln 2/k<sub>off</sub>.</li>
-  <li><b>Dissociation time</b>, <b>surface-bound (SPR/BLI)</b> — with Dissociation ticked, the simulation becomes a surface binding experiment, such as surface plasmon resonance or biolayer interferometry. The ligand flows over immobilized protein at a fixed concentration, so there is no depletion; after the association time it is replaced by buffer and the bound fraction decays as f<sub>end</sub>·e<sup>−k<sub>off</sub>t</sup>. The equilibrium curve is the response at the end of the association.</li>
       </ul>
+      </div>
+      </div>
       </div>
     </details>
     <details class="note" id="modelsCard">
