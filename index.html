@@ -519,6 +519,7 @@ footer a:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-ra
 /* the surface format is an option of Add Kinetics: indented under it, greyed while kinetics is off */
 .vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .lig .pt-off input{opacity:.45}
+.nd{color:var(--muted)}
 /* the Hill slope switch exists only while cooperativity is on */
 .stage:not(.coop) .modpanel .mslot .rowpair{display:none}
 .calcnote{font-size:10.5px;color:var(--muted);white-space:nowrap}
@@ -1067,7 +1068,7 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
   <li><b>K fit</b> — the Hill model's raw constant, in concentration<sup>n</sup>; shown only while <em>n</em> is fitted, when its K<sub>d</sub> is K<sup>1/n</sup>.</li>
   <li><b>Hill n</b> — the cooperativity the fit recovered.</li>
   <li><b>Cooperativity</b> — how binding at one site changes binding at the next, measured by the Hill coefficient <em>n</em>. At <em>n</em> = 1 sites are independent (or there is only one); <em>n</em> &gt; 1 is positive cooperativity, each binding event making the next easier; <em>n</em> &lt; 1 is negative. <em>n</em> sets the steepness of the curve — 10% to 90% occupancy spans 81<sup>1/n</sup>-fold in free ligand — and is not a count of sites or a stoichiometry.</li>
-  <li><b>[P]<sub>T</sub> fit</b> — the protein concentration the quadratic model returns when it is fitted rather than fixed. Useful when the active concentration is uncertain; it is only well defined when [P]<sub>T</sub> is near or above K<sub>d</sub>, where depletion shapes the curve.</li>
+  <li><b>[P]<sub>T</sub> fit</b> — the protein concentration the quadratic model returns when it is fitted rather than fixed. Useful when the active concentration is uncertain; it is only well defined when [P]<sub>T</sub> is near or above K<sub>d</sub>, where depletion shapes the curve, and shows as <em>n.d.</em> (not determined) when the data cannot pin it down. It is in the same unit as everything else.</li>
   <li><b>B<sub>max</sub></b> — the plateau the fitted curve rises to. Hold at 1 for a normalised readout; fit it when the curve may not get there.</li>
   <li><b>±</b> — asymptotic standard error: how tightly <em>this</em> dataset pins the value. A wrong model can fit precisely.</li>
   <li><b>RMSE</b> — root-mean-square residual over every replicate point. A correct model lands near the noise SD.</li>
@@ -1470,7 +1471,9 @@ function fitKP(raw, fitB, pt0){
     kLo = bk - ks; kHi = bk + ks; pLo = bp - ps; pHi = bp + ps;
   }
   var kd = Math.pow(10, bk), pt = Math.pow(10, bp);
-  return { kd: kd, pt: pt, B: fitB ? bestScale(raw, make(kd, pt)) : 1, sse: bestS };
+  // a best [P]T on the edge of the search means the data never pinned it down
+  var edge = bp <= p0 - 4 + 0.3 || bp >= p0 + 3 - 0.3;
+  return { kd: kd, pt: pt, edge: edge, B: fitB ? bestScale(raw, make(kd, pt)) : 1, sse: bestS };
 }
 
 /* ---- standard errors -------------------------------------------------
@@ -1595,6 +1598,8 @@ function fitLigand(L, sim){
       C = covOf(sim.raw, at, th);
       out.push({ model:'quadratic', kHalf:f.kd, K:f.kd, n:1, fittedN:false,
                  pt:f.pt, sePt: seAt(C, 1), fittedPt:true,
+                 // undetermined: on the search edge, or an error as large as the value
+                 ptUndef: f.edge || !(seAt(C, 1) < f.pt),
                  B:f.B, fittedB:fitBq, seB: fitBq ? seAt(C, 2) : null,
                  seHalf: seAt(C, 0), seK: seAt(C, 0), seN: null,
                  rmse: rmseOf(sim.raw, at(th)) });
@@ -2491,6 +2496,13 @@ function eqNotes(){
     ? '<b>' + (many ? 'Every titration would be' : 'The titration would be') + ' well designed at equilibrium.</b> ' + range + mid
     : '<b>' + (many ? 'Every titration is' : 'The titration is') + ' well designed' + (state.kin ? ' at equilibrium' : '') + '.</b> ' + range + mid);
   if (notEq) notes.unshift(notEq);
+  // Fit [P]T: say plainly when the data cannot determine it
+  if (state.fitQuadratic && state.fitPt){
+    var nd = D.filter(function(x){ return x.g.fits.some(function(f){ return f.fittedPt && f.ptUndef; }); });
+    if (nd.length) notes.push('<b>[P]<sub>T</sub> cannot be fitted</b> for ' + nd.map(function(x){
+        return x.tag + ' ([P]<sub>T</sub> ' + fmt(x.pt, 3) + ' ' + u + ', K<sub>d</sub> ' + fmt(x.kd, 3) + ' ' + u + ')'; }).join(', ') +
+      '. Well below K<sub>d</sub> the curve barely depends on [P]<sub>T</sub>, so the quadratic fit cannot pin it down and the table shows n.d.; its K<sub>d</sub> is still sound. Fitting [P]<sub>T</sub> needs [P]<sub>T</sub> near or above K<sub>d</sub>, where depletion shapes the curve; otherwise hold it at the known value.');
+  }
   return notes;
 }
 
@@ -2709,6 +2721,12 @@ var MODEL_NAME = { quadratic: 'Quadratic 1:1' };
 // place: nothing is printed more precisely than the fit can support. 493 +- 21
 // becomes 490 +- 20, not 493 +- 21.4. Only genuinely out-of-scale numbers fall
 // back to the exponent form - the unit selector is what keeps the rest legible.
+// a fitted [P]T, or n.d. when the data cannot determine it
+function ptCell(f){
+  if (!f || !f.fittedPt) return '\u2014';
+  if (f.ptUndef) return '<span class="nd">n.d.</span>';
+  return pm(f.pt, f.sePt);
+}
 function pm(v, se){
   if (se === null || se === undefined || !isFinite(se) || se <= 0) return fmt(v, 3);
   var seR = parseFloat(Number(se).toPrecision(1));
@@ -2772,7 +2790,7 @@ function renderResultsT(){
   if (state.fitQuadratic){
     sec('Quadratic 1:1');
     line('K<sub>d</sub> fit (' + u + ')', each('quadratic', function(f){ return pm(f.kHalf, f.seHalf); }));
-    if (state.fitPt) line('[P]<sub>T</sub> fit (' + u + ')', each('quadratic', function(f){ return f.fittedPt ? pm(f.pt, f.sePt) : '—'; }));
+    if (state.fitPt) line('[P]<sub>T</sub> fit (' + u + ')', each('quadratic', ptCell));
     if (state.bmaxQuad) line('B<sub>max</sub>', each('quadratic', function(f){ return pm(f.B, f.seB); }));
     line(rmseLab, each('quadratic', function(f){ return f.rmse.toFixed(3); }), rmseTitle);
   }
@@ -2953,7 +2971,7 @@ function renderResultsW(){
     var qd = pick('quadratic');
     if (state.fitQuadratic && qd){
       rows += '<td class="gl">' + pm(qd.kHalf, qd.seHalf) + '</td>';
-      if (state.fitPt) rows += '<td>' + (qd.fittedPt ? pm(qd.pt, qd.sePt) : '\u2014') + '</td>';
+      if (state.fitPt) rows += '<td>' + ptCell(qd) + '</td>';
       if (state.bmaxQuad) rows += '<td>' + pm(qd.B, qd.seB) + '</td>';
       rows += '<td>' + qd.rmse.toFixed(3) + '</td>';
     }
