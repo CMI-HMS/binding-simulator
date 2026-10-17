@@ -526,6 +526,7 @@ footer a:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-ra
 .vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .lig .pt-off input{opacity:.45}
 .nd{color:var(--muted)}
+.nt{text-transform:none}
 /* the Hill slope switch exists only while cooperativity is on */
 .stage:not(.coop) .modpanel .mslot .rowpair{display:none}
 .calcnote{font-size:10.5px;color:var(--muted);white-space:nowrap}
@@ -1268,6 +1269,28 @@ var SCENARIOS = [
       state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10, n:1, min:0.1221,  max:1000, reps:3, kon:1e6, koff:1e-2, kcalc:'off' };
       state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:100,n:1, min:1.221,   max:10000,reps:3, kon:1e6, koff:1e-1, kcalc:'off' };
     } },
+  { key:'hill', title:'Cooperativity',
+    blurb:'3 curves with variable hill slopes',
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = true; state.scale = 'log';
+      state.coop = true; state.kin = false;
+      state.sd = 0.02;
+      // 16 points of a 2-fold series down from 5000: the shallow n = 0.5 curve
+      // needs the extra decades
+      state.points = 16;
+      state.ligands[0] = { name:'n = 1',   on:true, pt:0.05, kd:50, n:1,   min:0.152588, max:5000, reps:3 };
+      state.ligands[1] = { name:'n = 2',   on:true, pt:0.05, kd:50, n:2,   min:0.152588, max:5000, reps:3 };
+      state.ligands[2] = { name:'n = 0.5', on:true, pt:0.05, kd:50, n:0.5, min:0.152588, max:5000, reps:3 };
+    } },
+  { key:'noise', title:'Noise and replicates',
+    blurb:'Heavy noise in duplicate.',
+    apply:function(){
+      state.fitSpecific = true; state.fitQuadratic = true; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.12;
+      state.ligands[0] = { name:'Ligand A', on:true, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:2 };
+      state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:6 };
+      state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:12 };
+    } },
   { key:'antibody', title:'Kinetics - high affinity',
     blurb:'Kd 0.1 nM, koff 5e-5 /s on a sensor surface',
     sets:{ rates:true },
@@ -1298,27 +1321,20 @@ var SCENARIOS = [
       state.ligands[1] = { name:'Slow on/off', on:true,  pt:0.05, kd:10, n:1, min:0.13717, max:100, dil:3, reps:3, kon:5e4, koff:5e-4, kcalc:'off' };
       state.ligands[2] = { name:'Ligand C',    on:false, pt:0.05, kd:10, n:1, min:0.13717, max:100, dil:3, reps:3, kon:1e5, koff:1e-3, kcalc:'off' };
     } },
-  { key:'hill', title:'Cooperativity',
-    blurb:'3 curves with variable hill slopes',
+  { key:'fragment', title:'Kinetics - weak small molecule',
+    blurb:'Kd 50 µM, koff 5 /s: too fast to resolve',
+    sets:{ rates:true },
     apply:function(){
-      state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = true; state.scale = 'log';
-      state.coop = true; state.kin = false;
-      state.sd = 0.02;
-      // 16 points of a 2-fold series down from 5000: the shallow n = 0.5 curve
-      // needs the extra decades
-      state.points = 16;
-      state.ligands[0] = { name:'n = 1',   on:true, pt:0.05, kd:50, n:1,   min:0.152588, max:5000, reps:3 };
-      state.ligands[1] = { name:'n = 2',   on:true, pt:0.05, kd:50, n:2,   min:0.152588, max:5000, reps:3 };
-      state.ligands[2] = { name:'n = 0.5', on:true, pt:0.05, kd:50, n:0.5, min:0.152588, max:5000, reps:3 };
-    } },
-  { key:'noise', title:'Noise and replicates',
-    blurb:'Heavy noise in duplicate.',
-    apply:function(){
-      state.fitSpecific = true; state.fitQuadratic = true; state.fitHill = false; state.scale = 'log';
-      state.sd = 0.12;
-      state.ligands[0] = { name:'Ligand A', on:true, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:2 };
-      state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:6 };
-      state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:10, n:1, min:0.1221, max:1000, reps:12 };
+      state.fitSpecific = true; state.fitQuadratic = false; state.fitHill = false; state.scale = 'log';
+      state.sd = 0.02; state.unit = 'µM';
+      // a fragment-like binder: kon 1e5 /M/s and Kd 50 µM give koff 5 /s
+      // (t½ 0.14 s). 8 two-fold steps down from 500 µM, 60 s on and 60 s
+      // off: square sensorgrams, so the affinity comes from the steady state
+      state.points = 8;
+      state.kin = true; state.surf = true; state.ta = 60; state.td = 60; state.tab = 'kin';
+      state.ligands[0] = { name:'Fragment', on:true,  pt:0.05, kd:50, n:1, min:3.90625, max:500, dil:2, reps:3, kon:1e5, koff:5, kcalc:'off' };
+      state.ligands[1] = { name:'Ligand B', on:false, pt:0.05, kd:50, n:1, min:3.90625, max:500, dil:2, reps:3, kon:1e5, koff:5, kcalc:'off' };
+      state.ligands[2] = { name:'Ligand C', on:false, pt:0.05, kd:50, n:1, min:3.90625, max:500, dil:2, reps:3, kon:1e5, koff:5, kcalc:'off' };
     } }
 ];
 
@@ -2429,7 +2445,7 @@ function kinDetail(g){
       '</td><td class="' + (r.pct >= 95 ? 'ok' : 'warn') + '">' + (r.pct >= 99.95 ? '100' : r.pct.toFixed(1)) + '</td></tr>';
   }).join('');
   var table = '<div class="tablescroll"><table class="rtab"><thead><tr>' +
-      '<th class="ca"><span class="sym">[L]<sub>T</sub> (' + u + ')</span></th>' +
+      '<th class="ca"><span class="sym">[L]<sub>T</sub> (' + nt(u) + ')</span></th>' +
       '<th><span class="sym">t<sub>eq</sub> (95%)</span></th>' +
       '<th><span class="sym">f<sub>eq</sub></span></th>' +
       '<th><span class="sym">f<sub>end</sub></span></th>' +
@@ -2541,13 +2557,13 @@ function renderDesignNotes(){
   var block = function(title, list){
     return '<div class="rc-notes dcol"><h4>' + title + '</h4>' + list.map(function(n){ return '<p>' + n + '</p>'; }).join('') + '</div>';
   };
+  // the closed accordion still says whether anything needs attention
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
+  var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
   var kd = surfOn() ? kinData() : [];
-  var kn = kd.length ? kinNotes(kd) : [];
+  var kn = kd.length ? kinNotes(kd, count(eq) > 0) : [];
   host.innerHTML = block('Equilibrium fit (steady state)', eq) +
     (surfOn() && kn.length ? block('Kinetic fit (rate constants)', kn) : '');
-  // the closed accordion still says whether anything needs attention
-  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Association is too short)/;
-  var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
   var n = count(eq.concat(kn));
   // surface-bound: the kinetics and the steady state are two separate fits,
   // so each gets its own verdict
@@ -2567,7 +2583,7 @@ function renderDesignNotes(){
 // in solution the read-at-a-time problem is already in the equilibrium notes.
 // A kinetic fit needs curvature in the association and decay in the
 // dissociation, not equilibrium.
-function kinNotes(kd){
+function kinNotes(kd, eqTrouble){
   var ta = state.ta, td = state.td, many = kd.length > 1, notes = [];
   var D = kd.map(function(K){ return { K: K }; });
   var who = function(list, fn){
@@ -2576,7 +2592,19 @@ function kinNotes(kd){
   // a ligand named where something needs fixing carries its colour
   var tag = function(x){ return ligTag(x.K.idx, x.K.name); };
   var pc = function(v){ var p = 100 * v; return (p >= 99.95 ? '100' : p < 10 ? p.toFixed(1) : p.toFixed(0)) + '%'; };
-  notes.push('<b>Equilibrium is not needed for a kinetic fit.</b> Fitting the association and dissociation curves together gives k<sub>on</sub> and k<sub>off</sub>, and K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>, as long as the association curves bend and the dissociation curves decay measurably.');
+  // only worth saying when the equilibrium fit has a problem
+  if (eqTrouble) notes.push('<b>Equilibrium is not needed for a kinetic fit.</b> Fitting the association and dissociation curves together gives k<sub>on</sub> and k<sub>off</sub>, and K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>, as long as the association curves bend and the dissociation curves decay measurably.');
+  // too fast: a complex that lives under ~2 s binds and unbinds within the
+  // injection and mixing time of an SPR/BLI instrument (about 1 s), so the
+  // sensorgrams are square and the rates cannot be fitted
+  var fast = D.filter(function(x){ return x.K.L.koff > 0.5; });
+  if (fast.length) notes.push('<b>Kinetics too fast to resolve</b>' +
+    (many ? ' for ' + fast.map(tag).join(', ') : '') + ': t½ = ' +
+    fast.map(function(x){ return dur(Math.LN2 / x.K.L.koff); }).join(', ') +
+    ', so association and dissociation are over within a few seconds, about as fast as an instrument can switch solutions (~1 s). The sensorgrams look square and k<sub>on</sub> and k<sub>off</sub> cannot be fitted reliably. Use the equilibrium (steady-state) fit, which fast rates make easy.');
+  D = D.filter(function(x){ return x.K.L.koff <= 0.5; });
+  many = D.length > 1;
+  if (!D.length) return notes;
   // association: the top concentration must bend toward its plateau, or kon
   // and koff cannot be told apart
   var top = function(x){ return x.K.pts[0]; };          // pts run high -> low
@@ -2747,6 +2775,8 @@ var MODEL_NAME = { quadratic: 'Quadratic 1:1' };
 // place: nothing is printed more precisely than the fit can support. 493 +- 21
 // becomes 490 +- 20, not 493 +- 21.4. Only genuinely out-of-scale numbers fall
 // back to the exponent form - the unit selector is what keeps the rest legible.
+// a unit inside an upper-case table header keeps its case (µM, not ΜM)
+function nt(u){ return '<span class="nt">' + u + '</span>'; }
 // a fitted [P]T, or n.d. when the data cannot determine it
 function ptCell(f){
   if (!f || !f.fittedPt) return '\u2014';
@@ -2800,7 +2830,7 @@ function renderResultsT(){
   var rmseLab = 'RMSE <span class="se">(noise SD ' + sig(state.sd, 3) + ')</span>';
   var rmseTitle = 'Root-mean-square residual over every replicate point; a correct model lands near the noise SD';
   sec('Simulation conditions');
-  line('K<sub>d</sub> (' + u + ')', G.map(function(g){ return fmt(num(g.L.kd, NaN), 3); }));
+  line('K<sub>d</sub> (' + nt(u) + ')', G.map(function(g){ return fmt(num(g.L.kd, NaN), 3); }));
   if (state.coop) line('Hill n', G.map(function(g){ return String(num(g.L.n, 1)); }));
   // noise-free: how far up the curve the titration is designed to reach
   line('f at [L]<sub>max</sub>', G.map(function(g){ return fmt(readAt(g.L, g.sim.hi), 3); }));
@@ -2808,15 +2838,15 @@ function renderResultsT(){
   if (state.fitSpecific){
     sec(specificName('cap'));
     if (state.fitHill) line('K fit (' + u + '<sup>n</sup>)', each('specific', function(f){ return f.fittedN ? pm(f.K, f.seK) : '—'; }));
-    line('K<sub>d</sub> fit (' + u + ')', each('specific', function(f){ return pm(f.kHalf, f.seHalf); }));
+    line('K<sub>d</sub> fit (' + nt(u) + ')', each('specific', function(f){ return pm(f.kHalf, f.seHalf); }));
     if (state.fitHill) line('Hill n', each('specific', function(f){ return pm(f.n, f.seN); }));
     if (state.bmaxSpec) line('B<sub>max</sub>', each('specific', function(f){ return pm(f.B, f.seB); }));
     line(rmseLab, each('specific', function(f){ return f.rmse.toFixed(3); }), rmseTitle);
   }
   if (state.fitQuadratic){
     sec('Quadratic 1:1');
-    line('K<sub>d</sub> fit (' + u + ')', each('quadratic', function(f){ return pm(f.kHalf, f.seHalf); }));
-    if (state.fitPt) line('[P]<sub>T</sub> fit (' + u + ')', each('quadratic', ptCell));
+    line('K<sub>d</sub> fit (' + nt(u) + ')', each('quadratic', function(f){ return pm(f.kHalf, f.seHalf); }));
+    if (state.fitPt) line('[P]<sub>T</sub> fit (' + nt(u) + ')', each('quadratic', ptCell));
     if (state.bmaxQuad) line('B<sub>max</sub>', each('quadratic', function(f){ return pm(f.B, f.seB); }));
     line(rmseLab, each('quadratic', function(f){ return f.rmse.toFixed(3); }), rmseTitle);
   }
@@ -2909,8 +2939,8 @@ function renderResultsW(){
     // no columns to name, so the header is reserved blank rather than dropped
     thead.innerHTML = '<tr class="ph"><th rowspan="2">Ligand</th>' +
       '<th class="grpth" colspan="2">x</th><th class="grpth gl">x</th></tr>' +
-      '<tr class="ph"><th>K<sub>d</sub> (' + u + ')</th>' +
-      '<th>f at [L]<sub>max</sub></th><th class="gl">K<sub>d</sub> fit (' + u + ')</th></tr>';
+      '<tr class="ph"><th>K<sub>d</sub> (' + nt(u) + ')</th>' +
+      '<th>f at [L]<sub>max</sub></th><th class="gl">K<sub>d</sub> fit (' + nt(u) + ')</th></tr>';
     tbody.innerHTML = msg('Choose at least one model to fit. The simulated data are plotted above.', 3);
     renderKinAcc(state.kin ? kinData() : []);
     alignModels();
@@ -2926,16 +2956,16 @@ function renderResultsW(){
   var rmseH = '<span title="Root-mean-square residual over every replicate point; a correct model lands near the noise SD (' +
     sig(state.sd, 3) + ')">RMSE</span>';
   var specCols = (showHalf ? ['K fit (' + u + '<sup>n</sup>)'] : [])
-    .concat(['K<sub>d</sub> fit (' + u + ')'], showHalf ? ['Hill n'] : [],
+    .concat(['K<sub>d</sub> fit (' + nt(u) + ')'], showHalf ? ['Hill n'] : [],
             state.bmaxSpec ? ['B<sub>max</sub>'] : [], [rmseH]);
-  var quadCols = ['K<sub>d</sub> fit (' + u + ')']
-    .concat(state.fitPt ? ['[P]<sub>T</sub> fit (' + u + ')'] : [], state.bmaxQuad ? ['B<sub>max</sub>'] : [], [rmseH]);
+  var quadCols = ['K<sub>d</sub> fit (' + nt(u) + ')']
+    .concat(state.fitPt ? ['[P]<sub>T</sub> fit (' + nt(u) + ')'] : [], state.bmaxQuad ? ['B<sub>max</sub>'] : [], [rmseH]);
 
   var kin = state.kin, kd = kin ? kinData() : [];
   document.getElementById('resSub').textContent = kin ? '· read at ' + dur(state.ta) : '';
   var h1 = '<tr><th rowspan="2">Ligand</th>' +
            '<th class="grpth" colspan="' + (2 + (kin ? 3 : 0) + (state.coop ? 1 : 0)) + '">Simulation conditions</th>',
-      h2 = '<tr><th>K<sub>d</sub> (' + u + ')</th>' + (state.coop ? '<th>Hill n</th>' : '') +
+      h2 = '<tr><th>K<sub>d</sub> (' + nt(u) + ')</th>' + (state.coop ? '<th>Hill n</th>' : '') +
            '<th>f at [L]<sub>max</sub></th>' +
            (kin ? '<th><span class="sym">k<sub>on</sub> (M⁻¹s⁻¹)</span></th><th><span class="sym">k<sub>off</sub> (s⁻¹)</span></th><th><span class="sym">t½</span></th>' : '');
   if (state.fitSpecific){
