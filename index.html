@@ -2477,20 +2477,40 @@ function eqNotes(){
     return { g: g, tag: ligTag(g.idx, g.name), pt: pt, kd: kd, n: n,
       top: f(g.sim.hi), bot: f(g.sim.lo), lo: g.sim.lo, hi: g.sim.hi,
       mid: xs.filter(function(x){ var v = f(x); return v > 0.1 && v < 0.9; }).length,
-      // total ligand that brings the protein to 95% / 5% bound
-      hiNeed: kd * Math.pow(19, 1 / n) + 0.95 * n * pt,
-      loNeed: kd * Math.pow(1 / 19, 1 / n) + 0.05 * n * pt };
+      // total ligand that brings the protein to 90% / 10% bound: the same
+      // limits the notes test against, so the advice clears the warning
+      hiNeed: kd * Math.pow(9, 1 / n) + 0.9 * n * pt,
+      loNeed: kd * Math.pow(1 / 9, 1 / n) + 0.1 * n * pt,
+      d: dilOf(L), np: clampInt(state.points, NPTS_MIN, NPTS_MAX, 12) };
   });
   var pct = function(v){ return Math.round(100 * v) + '%'; };
-  var top = D.filter(function(x){ return x.top < 0.9; });
+  // recommendations rounded outward to two figures, so following them clears the note
+  var r2 = function(v, up){ if (!(v > 0)) return v; var q = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+    return (up ? Math.ceil(v / q - 1e-9) : Math.floor(v / q + 1e-9)) * q; };
+  D.forEach(function(x){ x.hiNeed = r2(x.hiNeed, true); x.loNeed = r2(x.loNeed, false); });
+  // the points a series needs, at its present dilution, to span lo..hi
+  var ptsFor = function(x, lo, hi){ return x.d > 1 ? Math.ceil(Math.log(hi / lo) / Math.log(x.d) - 1e-9) + 1 : x.np; };
+  var top = D.filter(function(x){ return x.top < 0.9 - 1e-6; });
+  // why the top matters depends on what is fitted alongside Kd
+  var freeB = (state.fitSpecific && state.bmaxSpec) || (state.fitQuadratic && state.bmaxQuad);
+  var freeN = state.coop && state.fitHill;
   if (top.length) notes.push('<b>The highest concentration is too low.</b> ' + top.map(function(x){
+      var lo = Math.min(x.lo, x.loNeed), need = ptsFor(x, lo, x.hiNeed);
       return x.tag + ' reaches only ' + pct(x.top) + ' bound at ' + fmt(x.hi, 3) + ' ' + u +
-        '; raise [L]<sub>max</sub> to at least ' + fmt(x.hiNeed, 2) + ' ' + u; }).join('. ') +
-    '. Without the plateau, B<sub>max</sub> and K<sub>d</sub> trade off against each other and the fitted K<sub>d</sub> is poorly defined.');
-  var bot = D.filter(function(x){ return x.bot > 0.1; });
+        '; raise [L]<sub>max</sub> to at least ' + fmt(x.hiNeed, 2) + ' ' + u + ' (90% bound)' +
+        (need > x.np ? ' and use ' + need + ' points, so the ' + sigfig(x.d, 3) + '-fold series still starts at ' + fmt(lo, 2) + ' ' + u : ''); }).join('. ') +
+    (freeB || freeN
+      ? '. Without the plateau, ' + (freeB && freeN ? 'B<sub>max</sub> and <em>n</em> trade' : freeB ? 'B<sub>max</sub> trades' : '<em>n</em> trades') +
+        ' off against K<sub>d</sub>, and the fitted K<sub>d</sub> is poorly defined.'
+      : '. When B<sub>max</sub> is known (held at 1 in this simulation), the fit still returns a K<sub>d</sub>, but only from ' +
+        (top.length === 1 ? 'the curve up to ' + pct(top[0].top) + ' bound' : 'the part of each curve it reaches') +
+        '. Without the plateau, nothing confirms B<sub>max</sub>: if the assumed value is off, the K<sub>d</sub> is biased and the data cannot show it.'));
+  var bot = D.filter(function(x){ return x.bot > 0.1 + 1e-6; });
   if (bot.length) notes.push('<b>The lowest concentration is too high.</b> ' + bot.map(function(x){
+      var hi = Math.max(x.hi, x.top < 0.9 - 1e-6 ? x.hiNeed : 0), need = ptsFor(x, x.loNeed, hi);
       return x.tag + ' is already ' + pct(x.bot) + ' bound at ' + fmt(x.lo, 3) + ' ' + u +
-        '; lower [L]<sub>min</sub> to about ' + fmt(x.loNeed, 2) + ' ' + u; }).join('. ') +
+        '; lower [L]<sub>min</sub> to at most ' + fmt(x.loNeed, 2) + ' ' + u + ' (10% bound)' +
+        (need > x.np ? ', using ' + need + ' points to keep the ' + sigfig(x.d, 3) + '-fold dilution' : ''); }).join('. ') +
     '. A baseline anchors the bottom of the curve.');
   var tit = D.filter(function(x){ return x.pt > x.kd; });
   if (tit.length) notes.push('<b>The protein concentration is too high.</b> ' + tit.map(function(x){
@@ -2614,8 +2634,8 @@ function kinNotes(kd, eqTrouble){
     (many ? ' for ' + flat.map(tag).join(', ') : '') + ': even the highest concentration reaches only ' +
     flat.map(function(x){ return pc(reach(x)); }).join(', ') +
     ' of its plateau in ' + dur(ta) + ', so the curves are nearly straight and k<sub>on</sub> cannot be separated from k<sub>off</sub>. ' +
-    'Extend the association to at least ' + flat.map(function(x){ return dur(3 / top(x).kobs); }).join(', ') +
-    ' (95% of the plateau at the top concentration), or raise [L]<sub>max</sub>.');
+    'Extend the association to at least ' + flat.map(function(x){ return dur(1 / top(x).kobs); }).join(', ') +
+    ' (one time constant, 1/k<sub>obs</sub>: 63% of the plateau at the top concentration), or raise [L]<sub>max</sub>.');
   else notes.push('<b>Association shows curvature</b>: the highest concentration reaches ' +
     who(D, function(x){ return pc(reach(x)); }) + ' of its plateau in ' + dur(ta) +
     ', enough to define k<sub>on</sub>. The lower concentrations need not reach theirs.');
