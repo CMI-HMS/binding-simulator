@@ -2516,9 +2516,7 @@ function eqNotes(){
     (freeB || freeN
       ? '. Without the plateau, ' + (freeB && freeN ? 'B<sub>max</sub> and <em>n</em> trade' : freeB ? 'B<sub>max</sub> trades' : '<em>n</em> trades') +
         ' off against K<sub>d</sub>, and the fitted K<sub>d</sub> is poorly defined.'
-      : '. When B<sub>max</sub> is fixed at 1, the fit still returns a K<sub>d</sub>, but only from ' +
-        (top.length === 1 ? 'the curve up to ' + pct(top[0].top) + ' bound' : 'the part of each curve it reaches') +
-        '. Nothing confirms the plateau at B<sub>max</sub>: if the assumed value is off, the K<sub>d</sub> is biased and the data cannot show it.'));
+      : '. With B<sub>max</sub> fixed at 1 the fit still returns a K<sub>d</sub>, but nothing confirms the plateau: if the assumed B<sub>max</sub> is off, the K<sub>d</sub> is biased and the data cannot show it.'));
   // with [P]T above Kd the floor is set by depletion; the [P]T note covers it
   var bot = D.filter(function(x){ return x.bot > 0.1 + 1e-6 && x.pt <= x.kd; });
   if (bot.length) notes.push('<b>The lowest concentration is too high.</b> ' + bot.map(function(x){
