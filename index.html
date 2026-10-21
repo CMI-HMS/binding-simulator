@@ -2502,9 +2502,9 @@ function eqNotes(){
     (freeB || freeN
       ? '. Without the plateau, ' + (freeB && freeN ? 'B<sub>max</sub> and <em>n</em> trade' : freeB ? 'B<sub>max</sub> trades' : '<em>n</em> trades') +
         ' off against K<sub>d</sub>, and the fitted K<sub>d</sub> is poorly defined.'
-      : '. When B<sub>max</sub> is known (held at 1 in this simulation), the fit still returns a K<sub>d</sub>, but only from ' +
+      : '. When B<sub>max</sub> is fixed at 1, the fit still returns a K<sub>d</sub>, but only from ' +
         (top.length === 1 ? 'the curve up to ' + pct(top[0].top) + ' bound' : 'the part of each curve it reaches') +
-        '. Without the plateau, nothing confirms B<sub>max</sub>: if the assumed value is off, the K<sub>d</sub> is biased and the data cannot show it.'));
+        '. Nothing confirms the plateau at B<sub>max</sub>: if the assumed value is off, the K<sub>d</sub> is biased and the data cannot show it.'));
   var bot = D.filter(function(x){ return x.bot > 0.1 + 1e-6; });
   if (bot.length) notes.push('<b>The lowest concentration is too high.</b> ' + bot.map(function(x){
       var hi = Math.max(x.hi, x.top < 0.9 - 1e-6 ? x.hiNeed : 0), need = ptsFor(x, x.loNeed, hi);
