@@ -2537,6 +2537,25 @@ function eqNotes(){
   if (thin.length) notes.push('<b>Few points through the transition.</b> ' + thin.map(function(x){
       return x.tag + ' has ' + x.mid + ' point' + (x.mid === 1 ? '' : 's') + ' between 10% and 90% bound'; }).join(', ') +
     '. Use a smaller dilution factor or more points so the slope is sampled.');
+  // Noise. The trigger uses the noise SD that was set, so it does not flicker
+  // from one draw to the next: 0.1 of the full signal or more is too noisy,
+  // and above 0.05 it is too noisy if Kd ends up worse than +-10%. The Kd
+  // error is the fit's, rescaled from this draw's RMSE to the set SD, so it
+  // too is stable; the RMSE is quoted as what the experimenter would see.
+  var sd = Math.max(0, num(state.sd, 0));
+  var best = function(x){ return x.g.fits.reduce(function(a, f){ return !a || f.rmse < a.rmse ? f : a; }, null); };
+  var relOf = function(x){ var f = best(x);
+    return f && f.seHalf > 0 && f.kHalf > 0 && f.rmse > 0 ? (f.seHalf / f.kHalf) * (sd / f.rmse) : NaN; };
+  var noisy = D.filter(function(x){ var r = relOf(x); return best(x) && (sd >= 0.1 || (sd > 0.05 && r > 0.1)); });
+  if (noisy.length) notes.push('<b>The noise is too high.</b> ' + noisy.map(function(x){
+      var f = best(x), rel = relOf(x);
+      // judged on the percentage as printed, so +-10% never asks for more
+      if (isFinite(rel) && Math.round(100 * rel) <= 10) rel = Math.min(rel, 0.1);
+      var reps = Math.max(1, Math.round(num(x.g.L.reps, 3))), need = isFinite(rel) ? Math.ceil(reps * Math.pow(rel / 0.1, 2)) : 0;
+      return x.tag + ' scatters with an RMSE of ' + f.rmse.toFixed(2) + ' (' + Math.round(100 * f.rmse) + '% of the full signal)' +
+        (isFinite(rel) ? (rel <= 0.1 ? '; its replicates still pin K<sub>d</sub> to ±' + Math.round(100 * rel) + '%' : ', so its K<sub>d</sub> is known only to ±' + Math.round(100 * rel) + '%') +
+          (rel > 0.1 ? (need <= 12 ? '; about ' + need + ' replicates would bring that to ±10%' : '; replicates alone cannot bring that to ±10%, so the noise itself has to come down') : '') : ''); }).join('. ') +
+    '. As a guide, an RMSE under 0.05 of the signal is good and over 0.1 is too noisy. A correct model lands at the noise level, so an RMSE well above the scatter of the replicates points to the wrong model rather than noise.');
   var range = D.map(function(x){ return (many ? x.tag + ' runs ' : 'It runs from ') + pct(x.bot) + ' to ' + pct(x.top) + ' bound with ' + x.mid + ' points between 10% and 90%'; }).join('; ');
   // with kinetics on, the curve is only an equilibrium measurement if every
   // point has got there by the read; when they have not, that comes first and
@@ -2590,7 +2609,7 @@ function renderDesignNotes(){
     return '<div class="rc-notes dcol"><h4>' + title + '</h4>' + list.map(function(n){ return '<p>' + n + '</p>'; }).join('') + '</div>';
   };
   // the closed accordion still says whether anything needs attention
-  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The noise is too high|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
   var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
   var kd = surfOn() ? kinData() : [];
   var kn = kd.length ? kinNotes(kd, count(eq) > 0) : [];
@@ -2607,7 +2626,13 @@ function renderDesignNotes(){
   else document.getElementById('designSub').innerHTML = n
     ? '<span class="bad">' + n + (n === 1 ? ' issue' : ' issues') + '</span> to review'
     : '<span class="ok">No issues</span> · the design looks sound';
+  // when issues first appear, open the notes; once open, the reader's own
+  // open/close choice is left alone until the design is clean again and a
+  // new issue turns up
+  if (n > 0 && !(lastIssues > 0)) panel.open = true;
+  lastIssues = n;
 }
+var lastIssues = 0;
 
 // The kinetic design notes for every ligand together:
 // each point is made once, naming the ligands it applies to.
@@ -3140,6 +3165,8 @@ function renderScenarios(){
     state.preset = sc.key;
     reseed();
     renderAll();
+    // a scenario with a sound design starts with its notes folded away
+    if (!(lastIssues > 0)) document.getElementById('designPanel').open = false;
   });
 }
 function syncScenario(){
