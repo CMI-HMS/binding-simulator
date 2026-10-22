@@ -16,9 +16,9 @@
   --grid:#D3DBD9;
   --axis:#7D8886;
   --tick:#3F4A48;
-  --s1:#2a78d6;
+  --s1:#22508F;
   --s2:#eb6834;
-  --s3:#1baf7a;
+  --s3:#5B8C3A;
   --field:#FFFFFF;
   --on:#4C5856;
   --ok:#2b7a3e; --bad:#9e150b; --assoc:rgba(90,85,95,.05); --ramp-l:44;
@@ -31,7 +31,7 @@
     --plane:#0B0F0E; --surface:#161B1A; --surface-2:#1C2221;
     --ink:#F1F4F3; --ink-2:#A9B4B2; --muted:#7E8987;
     --line:#272E2D; --line-2:#343C3B; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --s1:#5C93DB; --s2:#d95926; --s3:#7DAA5C;
     --field:#101514; --on:#C7D0CE; --shadow:0 1px 2px rgba(0,0,0,.35);
     --ok:#6cc983; --bad:#f07b70; --assoc:rgba(200,195,210,.05); --ramp-l:66;
   }
@@ -40,7 +40,7 @@
   --plane:#0B0F0E; --surface:#161B1A; --surface-2:#1C2221;
   --ink:#F1F4F3; --ink-2:#A9B4B2; --muted:#7E8987;
   --line:#272E2D; --line-2:#343C3B; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --s1:#5C93DB; --s2:#d95926; --s3:#7DAA5C;
   --field:#101514; --on:#C7D0CE; --shadow:0 1px 2px rgba(0,0,0,.35);
   --ok:#6cc983; --bad:#f07b70; --assoc:rgba(200,195,210,.05); --ramp-l:66;
 }
@@ -2207,7 +2207,7 @@ function dur(s){
 }
 
 // one hue per ligand, matching the swatches; darkest = highest concentration
-var HUES = [214, 18, 158];
+var HUES = [214, 18, 95];
 function shade(ai, q, n){
   var dark = (parseFloat(cssVar('--ramp-l')) || 44) > 55;
   var f = n <= 1 ? 0 : q / (n - 1);
