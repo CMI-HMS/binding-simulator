@@ -803,6 +803,17 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
 .kkey.underleg .kk{display:inline-flex;align-items:center;gap:6px}
 .kkey.underleg .ramp{margin:0}
 .scalerow .scaletog button{font-size:12px;padding:2px 10px}
+.legendrow > .scalerow{display:flex;align-items:center;gap:10px}
+.xrange{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.xrange label{margin:0;font-size:12px;color:var(--muted)}
+.xrange .xin{position:relative;display:inline-flex}
+.xrange input{width:74px;font-family:var(--mono);font-size:11.5px;padding:2px 17px 2px 4px;text-align:right}
+.xrange .xsp{position:absolute;right:2px;top:2px;bottom:2px;display:flex;flex-direction:column;width:13px}
+.xrange .xsp button{flex:1;border:0;background:none;padding:0;font-size:7px;line-height:1;color:var(--muted);cursor:pointer;border-radius:2px}
+.xrange .xsp button:hover{background:var(--surface-2);color:var(--ink)}
+.xrange input::placeholder{color:var(--muted);opacity:.8}
+.xrange > button{font:inherit;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);color:var(--ink-2);cursor:pointer}
+.xrange > button[disabled]{opacity:.45;cursor:default}
 .stage .chart-head > .gt-h,.stage .kin-head > .gt-h,.stage .gtabs{grid-column:2;grid-row:1;justify-self:center;margin:0}
 .stage .chart-head > .export,.stage .kin-head > .export{grid-column:3;grid-row:1;justify-self:end;margin:0;position:relative}
 .stage .export .said{position:absolute;right:0;top:100%;margin-top:2px;white-space:nowrap}
@@ -937,6 +948,13 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
           <div class="keyline" id="keyline"></div>
         </div>
         <div class="scalerow">
+        <div class="xrange" role="group" aria-label="X axis range">
+          <label for="xMin">x</label>
+          <span class="xin"><input type="text" inputmode="decimal" id="xMin" aria-label="X axis minimum"><span class="xsp"><button type="button" tabindex="-1" data-x="xmin" data-dir="1" aria-label="Raise the minimum">▲</button><button type="button" tabindex="-1" data-x="xmin" data-dir="-1" aria-label="Lower the minimum">▼</button></span></span>
+          <span class="xdash">–</span>
+          <span class="xin"><input type="text" inputmode="decimal" id="xMax" aria-label="X axis maximum"><span class="xsp"><button type="button" tabindex="-1" data-x="xmax" data-dir="1" aria-label="Raise the maximum">▲</button><button type="button" tabindex="-1" data-x="xmax" data-dir="-1" aria-label="Lower the maximum">▼</button></span></span>
+          <button type="button" id="xAuto" title="Back to the automatic range">Auto</button>
+        </div>
         <div class="scaletog" role="group" aria-label="X axis scale">
           <button id="scaleLog" aria-pressed="true">Log x</button>
           <button id="scaleLin" aria-pressed="false">Linear x</button>
@@ -1219,6 +1237,9 @@ var state = {
   // immobilized protein, so it is never depleted; td is the dissociation time (s)
   surf: false,
   td: 600,
+  // equilibrium x-axis range; null means automatic (the data range)
+  xmin: null,
+  xmax: null,
   // layout preview and, with kinetics on, which curve tab is showing
   layout: 'A',
   tab: 'eq',
@@ -1834,6 +1855,14 @@ function xTicks(d){
       v = Math.pow(10, e);
       if (v >= d[0] * 0.999 && v <= d[1] * 1.001) t.push(v);
     }
+    // a range under a decade or two: add the 2s and 5s
+    if (t.length < 3){
+      t = [];
+      for (e = lo - 1; e <= hi; e++) [1, 2, 5].forEach(function(m){
+        v = m * Math.pow(10, e);
+        if (v >= d[0] * 0.999 && v <= d[1] * 1.001) t.push(v);
+      });
+    }
   } else {
     var range = d[1] - d[0], raw = range / 6;
     var mag = Math.pow(10, Math.floor(Math.log10(raw))), nr = raw / mag;
@@ -1876,7 +1905,7 @@ function draw(){
   for (var pass = 0; pass < 6 && (W !== pw || H !== ph); pass++){ pw = W; ph = H; sizePlot(); }
   // A linear axis reads as a share of the total added, so it starts at zero
   // whatever the lowest point is; a log axis cannot, and keeps the data range.
-  var c = cache, d = state.scale === 'log' ? c.d : [0, c.d[1]], s = '', i;
+  var c = cache, d = domainNow(), s = '', i;
   var ay = H - M.b;
   // draw C first and A last, so ligand A sits in front
   var back = c.groups.slice().reverse();
@@ -1954,6 +1983,7 @@ function draw(){
   back.forEach(function(g){
     var gc = col(g.idx % 3);
     g.sim.pts.forEach(function(p){
+      if (p.x < d[0] * (1 - 1e-9) || p.x > d[1] * (1 + 1e-9)) return;
       var px = sx(p.x, d);
       if (p.sd !== null && p.sd > 0){
         var y1 = sy(p.mean + p.sd), y2 = sy(p.mean - p.sd);
@@ -1966,6 +1996,7 @@ function draw(){
   });
 
   document.getElementById('plot').innerHTML = s;
+  syncXRange();
   hideTip();
   placeScale();
 }
@@ -1979,7 +2010,17 @@ function draw(){
 
 var hoverAt = null;   // x of the hairline in plot coordinates, kept for the keyboard
 
-function domainNow(){ return state.scale === 'log' ? cache.d : [0, cache.d[1]]; }
+function autoDomain(){ return state.scale === 'log' ? cache.d : [0, cache.d[1]]; }
+// the x range in force: the automatic one, with either end replaced by what
+// was typed, as long as the result is a usable range for the scale
+function domainNow(){
+  var a = autoDomain(), lo = state.xmin, hi = state.xmax;
+  lo = (lo !== null && isFinite(lo)) ? lo : a[0];
+  hi = (hi !== null && isFinite(hi)) ? hi : a[1];
+  if (state.scale === 'log' && !(lo > 0)) lo = a[0];
+  if (!(hi > lo)) return a;
+  return [lo, hi];
+}
 
 // plot coordinate -> concentration, the inverse of sx within the axes
 function xOfPixel(ux, d){
@@ -3521,6 +3562,62 @@ function setLowMode(m){
 }
 
 document.getElementById('scaleLog').addEventListener('click', function(){ state.scale = 'log'; redraw(); });
+// x range: an empty box is automatic; Enter or leaving the box applies it
+function syncXRange(){
+  var a = autoDomain(), mn = document.getElementById('xMin'), mx = document.getElementById('xMax');
+  if (!mn) return;
+  mn.placeholder = sigfig(a[0], 3); mx.placeholder = sigfig(a[1], 3);
+  if (document.activeElement !== mn) mn.value = state.xmin === null ? '' : state.xmin;
+  if (document.activeElement !== mx) mx.value = state.xmax === null ? '' : state.xmax;
+  document.getElementById('xAuto').disabled = state.xmin === null && state.xmax === null;
+}
+['xMin', 'xMax'].forEach(function(id){
+  var el = document.getElementById(id), key = id === 'xMin' ? 'xmin' : 'xmax';
+  var apply = function(){
+    var v = parseFloat(el.value);
+    state[key] = (el.value.trim() === '' || !isFinite(v)) ? null : v;
+    redraw();
+  };
+  el.addEventListener('change', apply);
+  el.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { el.blur(); } });
+});
+document.getElementById('xAuto').addEventListener('click', function(){ state.xmin = state.xmax = null; redraw(); });
+// Stepping an end of the x range starts from where that end is now (the
+// automatic value when the box is empty). On a log axis each step is one fold
+// dilution of the first ligand shown; on a linear axis it is a tenth of the
+// automatic range, rounded to 1, 2 or 5.
+function xStep(key, dir){
+  if (!cache) return;
+  var dom = domainNow(), i = key === 'xmin' ? 0 : 1, cur = state[key] !== null ? state[key] : dom[i], v;
+  if (state.scale === 'log'){
+    var L = cache.groups.length ? cache.groups[0].L : null, f = L ? dilOf(L) : 2;
+    if (!(f > 1.0001)) f = 2;
+    v = dir > 0 ? cur * f : cur / f;
+  } else {
+    var a = autoDomain(), raw = (a[1] - a[0]) / 10, mag = Math.pow(10, Math.floor(Math.log10(raw))), nr = raw / mag;
+    var st = (nr < 1.5 ? 1 : nr < 3 ? 2 : nr < 7 ? 5 : 10) * mag;
+    v = Math.round((cur + dir * st) / st) * st;
+  }
+  v = parseFloat(sigfig(v, 3));
+  // keep the two ends in order, and the minimum above zero on a log axis
+  if (i === 0 && (!(v < dom[1]) || (state.scale === 'log' && !(v > 0)) || v < 0)) return;
+  if (i === 1 && !(v > dom[0])) return;
+  state[key] = v;
+  redraw();
+}
+document.querySelectorAll('.xsp button').forEach(function(btn){
+  btn.addEventListener('mousedown', function(ev){ ev.preventDefault(); });   // keep focus where it is
+  btn.addEventListener('click', function(){ xStep(btn.getAttribute('data-x'), +btn.getAttribute('data-dir')); });
+});
+['xMin', 'xMax'].forEach(function(id){
+  var el = document.getElementById(id), key = id === 'xMin' ? 'xmin' : 'xmax';
+  el.addEventListener('keydown', function(ev){
+    if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+    ev.preventDefault();
+    xStep(key, ev.key === 'ArrowUp' ? 1 : -1);
+    el.value = state[key] === null ? '' : state[key];
+  });
+});
 document.getElementById('scaleLin').addEventListener('click', function(){ state.scale = 'linear'; redraw(); });
 
 // ---- export ---------------------------------------------------------------
