@@ -809,6 +809,15 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
 .xrange{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
 .xrange label{margin:0;font-size:12px;color:var(--muted)}
 .xrange .xin{position:relative;display:inline-flex}
+.nin{position:relative;display:flex;width:100%}
+.nin .xsp{position:absolute;right:2px;top:2px;bottom:2px;display:flex;flex-direction:column;width:12px}
+.nin .xsp button{flex:1;border:0;background:none;padding:0;font-size:7px;line-height:1;color:var(--muted);cursor:pointer;border-radius:2px}
+.nin .xsp button:hover{background:var(--surface-2);color:var(--ink)}
+input.stepin{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;padding-right:16px!important}
+.lig input.stepin{font-size:12px;padding:2px 16px 2px 4px}
+input.stepin:disabled ~ .xsp,input.stepin[readonly] ~ .xsp{display:none}
+.ktimes input.stepin{width:100%;box-sizing:border-box}
+.ktimes input.stepin:disabled{opacity:.45}
 .xrange input{width:74px;font-family:var(--mono);font-size:11.5px;padding:2px 17px 2px 4px;text-align:right}
 .xrange .xsp{position:absolute;right:2px;top:2px;bottom:2px;display:flex;flex-direction:column;width:13px}
 .xrange .xsp button{flex:1;border:0;background:none;padding:0;font-size:7px;line-height:1;color:var(--muted);cursor:pointer;border-radius:2px}
@@ -908,11 +917,11 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
       <div class="ktimes off" id="kinTimes">
         <div>
           <label for="kinTa" title="Association time: how long protein and ligand are incubated before the read">Association (s)</label>
-          <input type="number" id="kinTa" min="1" step="any" value="600">
+          <span class="nin"><input type="text" inputmode="decimal" class="stepin" data-step="time" id="kinTa" value="600"><span class="xsp"><button type="button" tabindex="-1" data-dir="1" aria-label="Increase">▲</button><button type="button" tabindex="-1" data-dir="-1" aria-label="Decrease">▼</button></span></span>
         </div>
         <div>
           <label class="ktchk" title="Add a dissociation phase: a surface experiment such as SPR or BLI, where the ligand flows over immobilized protein and is then washed out"><input type="checkbox" id="surfOn">Dissociation (s)</label>
-          <input type="number" id="kinTd" min="1" step="any" value="600" aria-label="Dissociation time (s)" title="Dissociation time: how long the surface is washed with buffer after the association">
+          <span class="nin"><input type="text" inputmode="decimal" class="stepin" data-step="time" id="kinTd" value="600" aria-label="Dissociation time (s)" title="Dissociation time: how long the surface is washed with buffer after the association"><span class="xsp"><button type="button" tabindex="-1" data-dir="1" aria-label="Increase">▲</button><button type="button" tabindex="-1" data-dir="-1" aria-label="Decrease">▼</button></span></span>
         </div>
       </div>
         </div>
@@ -3266,9 +3275,22 @@ function derivedRow(i, f, label, value, title, dot){
     value + '</div></div>';
 }
 
+// [L]max and [L]min step by the ligand's own fold dilution, so the series
+// moves one point at a time; Kd and [P]T step along 1-2-5-10
+var STEP_KIND = { max: 'fold', min: 'fold', kd: 'nice', pt: 'nice', dil: 'dil' };
+// the dilutions people actually pipette
+var DILS = [1.2, 1.5, 2, 2.5, 3, 4, 5, 10];
+function stepper(){
+  return '<span class="xsp"><button type="button" tabindex="-1" data-dir="1" aria-label="Increase">▲</button>' +
+    '<button type="button" tabindex="-1" data-dir="-1" aria-label="Decrease">▼</button></span>';
+}
 function fieldRow(i, f, label, attrs, dot){
+  var kind = STEP_KIND[f];
+  var input = kind
+    ? '<span class="nin"><input type="text" inputmode="decimal" class="stepin" data-step="' + kind + '" id="' + f + i + '" data-f="' + f + '" data-i="' + i + '" ' + attrs + '>' + stepper() + '</span>'
+    : '<input type="number" id="' + f + i + '" data-f="' + f + '" data-i="' + i + '" ' + attrs + '>';
   return '<div>' + (dot ? '<div class="kl"><label for="' + f + i + '">' + label + '</label>' + dot + '</div>' : '<label for="' + f + i + '">' + label + '</label>') +
-    '<input type="number" id="' + f + i + '" data-f="' + f + '" data-i="' + i + '" ' + attrs + '></div>';
+    input + '</div>';
 }
 
 function renderLigands(){
@@ -3585,6 +3607,60 @@ function syncXRange(){
   el.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { el.blur(); } });
 });
 document.getElementById('xAuto').addEventListener('click', function(){ state.xmin = state.xmax = null; redraw(); });
+// Value-scaled stepping for the parameter fields: the arrows (and the arrow
+// keys) move a value in proportion to its size, then hand it to the field's
+// own input handler as if it had been typed.
+function niceStep(v, dir){
+  var e = Math.floor(Math.log10(v)) - 1, best = null;
+  for (var k = e; k <= e + 3; k++) [1, 2, 5].forEach(function(m){
+    var c = m * Math.pow(10, k);
+    if (dir > 0 ? c > v * (1 + 1e-9) && (best === null || c < best) : c < v * (1 - 1e-9) && (best === null || c > best)) best = c;
+  });
+  return best;
+}
+function stepValue(el, dir){
+  var kind = el.getAttribute('data-step'), v = parseFloat(el.value);
+  if (!(v > 0)) return null;
+  if (kind === 'fold'){
+    var L = state.ligands[+el.getAttribute('data-i')], f = L ? dilOf(L) : 2;
+    if (!(f > 1.0001)) f = 2;
+    return parseFloat(sigfig(dir > 0 ? v * f : v / f, 4));
+  }
+  if (kind === 'nice') return niceStep(v, dir);
+  if (kind === 'dil'){
+    var up = DILS.filter(function(c){ return c > v * (1 + 1e-9); }), dn = DILS.filter(function(c){ return c < v * (1 - 1e-9); });
+    if (dir > 0) return up.length ? up[0] : parseFloat(sigfig(v * 2, 3));
+    return dn.length ? dn[dn.length - 1] : null;
+  }
+  if (kind === 'time'){
+    // one unit of the current order of magnitude: 600 -> 700/500, 60 -> 70/50,
+    // and 100 steps down to 90
+    var st = Math.pow(10, Math.floor(Math.log10(dir > 0 ? v : v * (1 - 1e-9))));
+    return Math.max(1, Math.round((v + dir * st) / st) * st);
+  }
+  return null;
+}
+function doStep(el, dir){
+  if (!el || el.disabled || el.readOnly) return;
+  var v = stepValue(el, dir);
+  if (!(v > 0)) return;
+  el.value = v;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+document.addEventListener('mousedown', function(ev){ if (ev.target.closest && ev.target.closest('.nin .xsp button')) ev.preventDefault(); });
+document.addEventListener('click', function(ev){
+  var b = ev.target.closest && ev.target.closest('.nin .xsp button');
+  if (!b) return;
+  doStep(b.closest('.nin').querySelector('input'), +b.getAttribute('data-dir'));
+});
+document.addEventListener('keydown', function(ev){
+  var el = ev.target;
+  if (!el.classList || !el.classList.contains('stepin') || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
+  ev.preventDefault();
+  doStep(el, ev.key === 'ArrowUp' ? 1 : -1);
+});
+
 // Stepping an end of the x range starts from where that end is now (the
 // automatic value when the box is empty). On a log axis each step is one fold
 // dilution of the first ligand shown; on a linear axis it is a tenth of the
