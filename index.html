@@ -527,6 +527,8 @@ footer a:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-ra
 .lig .pt-off input{opacity:.45}
 .nd{color:var(--muted)}
 .nt{text-transform:none}
+/* upper-case headings keep the case of subscripts and superscripts: Kd, not KD */
+thead th sub,thead th sup,.sec sub,.sec sup,.side tr.sec-row th sub,.nbody .msub sub,.kacc-h sub,.rc-notes h4 sub{text-transform:none}
 /* the Hill slope switch exists only while cooperativity is on */
 .stage:not(.coop) .modpanel .mslot .rowpair{display:none}
 .calcnote{font-size:10.5px;color:var(--muted);white-space:nowrap}
@@ -2565,15 +2567,16 @@ function eqNotes(){
       return x.tag + ' is already ' + pct(x.bot) + ' bound at ' + fmt(x.lo, 3) + ' ' + u +
         '. [L]<sub>min</sub> needs to be at most ' + fmt(x.loNeed, 2) + ' ' + u + ' (10% bound)' + span(x, x.loNeed, hi, false); }).join('. ') +
     '. A baseline anchors the bottom of the curve.');
-  var tit = D.filter(function(x){ return x.pt > x.kd; });
-  if (tit.length) notes.push('<b>The protein concentration is too high.</b> ' + tit.map(function(x){
-      return x.tag + ' has [P]<sub>T</sub> at ' + sci(x.pt / x.kd) + '× K<sub>d</sub>'; }).join(', ') +
-    '. This is a stoichiometric titration: the curve tracks [P]<sub>T</sub> rather than K<sub>d</sub>, its midpoint sits near K<sub>d</sub> + [P]<sub>T</sub>/2, and even the quadratic fit has little to say about K<sub>d</sub>. Lower [P]<sub>T</sub> toward K<sub>d</sub>/10 if the signal allows.');
-  var dep = D.filter(function(x){ return x.pt > 0.1 * x.kd && x.pt <= x.kd; });
+  // Depletion: any [P]T above Kd/10 draws down free ligand and shifts the
+  // curve. Above Kd it is also a stoichiometric titration, said in the same note.
+  var dep = D.filter(function(x){ return x.pt > 0.1 * x.kd; });
+  var tit = dep.filter(function(x){ return x.pt > x.kd; });
   if (dep.length) notes.push('<b>Ligand depletion shifts the curve.</b> ' + dep.map(function(x){
       return x.tag + ' has [P]<sub>T</sub> at ' + sci(x.pt / x.kd) + '× K<sub>d</sub> (midpoint ≈ ' +
-        fmt(x.kd + x.pt / 2, 3) + ' ' + u + ')'; }).join(', ') +
-    '. Fit with the quadratic model, which accounts for bound ligand, or lower [P]<sub>T</sub> below K<sub>d</sub>/10.');
+        fmt(x.kd + x.pt / 2, 3) + ' ' + u + ')'; }).join(', ') + '. ' +
+    (tit.length ? (many && tit.length < dep.length ? 'For ' + tit.map(function(x){ return x.tag; }).join(', ') + ', this' : 'This') +
+      ' is a stoichiometric titration: the curve tracks [P]<sub>T</sub> rather than K<sub>d</sub>, its midpoint sits near K<sub>d</sub> + [P]<sub>T</sub>/2. ' : '') +
+    'Fit with the quadratic model, which accounts for bound ligand. If signal allows, lower [P]<sub>T</sub> toward K<sub>d</sub>/10.');
   var thin = D.filter(function(x){ return x.mid < 4; });
   if (thin.length) notes.push('<b>Few points through the transition.</b> ' + thin.map(function(x){
       return x.tag + ' has ' + x.mid + ' point' + (x.mid === 1 ? '' : 's') + ' between 10% and 90% bound'; }).join(', ') +
