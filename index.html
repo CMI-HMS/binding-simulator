@@ -3118,7 +3118,7 @@ function renderResultsW(){
   var fitN = (state.fitSpecific ? specCols.length : 0) + (state.fitQuadratic ? quadCols.length : 0);
   var hA = '<tr class="suprow"><th rowspan="3">Ligand</th>' +
            '<th class="suphd" colspan="' + (simN + ssN) + '">Simulated conditions</th>' +
-           '<th class="suphd gl" colspan="' + fitN + '">Data fitting</th>',
+           '<th class="suphd gl" colspan="' + fitN + '">Equilibrium fit</th>',
       h1 = '<tr class="grprow"><th class="grpth" colspan="' + simN + '">' + (kin ? 'Parameters' : '') + '</th>',
       h2 = '<tr><th>K<sub>d</sub> (' + nt(u) + ')</th>' + (state.coop ? '<th>Hill <span class="nt">n</span></th>' : '') +
            '<th><span class="nt">f</span> at [L]<sub>max</sub></th>' +
