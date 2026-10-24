@@ -13,6 +13,7 @@
   --muted:#7C8785;
   --line:#DBE2E0;
   --line-2:#C5CECC;
+  --rule:#97A3A1;
   --grid:#D3DBD9;
   --axis:#7D8886;
   --tick:#3F4A48;
@@ -30,7 +31,7 @@
   :root:not([data-theme="light"]){
     --plane:#0B0F0E; --surface:#161B1A; --surface-2:#1C2221;
     --ink:#F1F4F3; --ink-2:#A9B4B2; --muted:#7E8987;
-    --line:#272E2D; --line-2:#343C3B; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
+    --line:#272E2D; --line-2:#343C3B; --rule:#56615F; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
     --s1:#5C93DB; --s2:#d95926; --s3:#7DAA5C;
     --field:#101514; --on:#C7D0CE; --shadow:0 1px 2px rgba(0,0,0,.35);
     --ok:#6cc983; --bad:#f07b70; --assoc:rgba(200,195,210,.05); --ramp-l:66;
@@ -39,7 +40,7 @@
 :root[data-theme="dark"]{
   --plane:#0B0F0E; --surface:#161B1A; --surface-2:#1C2221;
   --ink:#F1F4F3; --ink-2:#A9B4B2; --muted:#7E8987;
-  --line:#272E2D; --line-2:#343C3B; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
+  --line:#272E2D; --line-2:#343C3B; --rule:#56615F; --grid:#2F3735; --axis:#6A7472; --tick:#B8C2C0;
   --s1:#5C93DB; --s2:#d95926; --s3:#7DAA5C;
   --field:#101514; --on:#C7D0CE; --shadow:0 1px 2px rgba(0,0,0,.35);
   --ok:#6cc983; --bad:#f07b70; --assoc:rgba(200,195,210,.05); --ramp-l:66;
@@ -424,6 +425,9 @@ thead th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:va
    own block of columns here. */
 thead .grpth{text-align:center;padding:0 9px 2px;border-bottom:0;font-size:11px;
   letter-spacing:.05em;color:var(--ink-2)}
+/* the top row splits what was simulated from what the fits recovered */
+thead .suphd{text-align:center;padding:2px 9px 3px;font-size:11.5px;letter-spacing:.07em;color:var(--ink);
+  border-bottom:1px solid var(--rule)}
 tbody td{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
 tbody td:first-child{font-family:var(--sans);font-weight:500}
 /* The table holds a row per ligand whether or not that ligand is switched on.
@@ -434,6 +438,8 @@ tbody td:first-child{font-family:var(--sans);font-weight:500}
 tbody tr.ph td,thead tr.ph th{visibility:hidden;border-color:transparent}
 tbody tr.end td,tbody tr.end th{border-bottom:0}
 th.gl,td.gl{border-left:1px solid var(--line)}
+/* the divide between what was simulated and what was fitted: as dark as the header rules */
+th.fitb,td.fitb{border-left:1px solid var(--rule)}
 .nm{display:inline-flex;align-items:center;gap:7px}
 .fixedtag{color:var(--muted);font-family:var(--sans);font-size:11.5px}
 .se{color:var(--muted);font-size:12px;white-space:nowrap}
@@ -769,6 +775,8 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
 .colM .side table.tight td{font-size:12px}
 .colM .side thead th{font-size:10.5px;letter-spacing:.03em}
 .colM .side thead tr + tr th{height:30px;vertical-align:bottom}
+/* the sub-group row (Parameters, Steady-state, the models) only needs its line */
+.colM .side thead tr.grprow th{height:auto;padding-top:1px;padding-bottom:1px}
 .colM .side table.tight .se{display:block;font-size:10px;line-height:1.1}
 .colR .side th.rl .se{display:block;font-size:10px;line-height:1.1;font-weight:400}
 .colR .side table.many .se{font-size:10px;display:block;line-height:1.1;margin-top:-1px}
@@ -1958,9 +1966,8 @@ function draw(){
     g.fits.slice().sort(function(a){ return a.model === 'quadratic' ? -1 : 1; }).forEach(function(f){
       if (!isFinite(f.kHalf) || f.kHalf < d[0] || f.kHalf > d[1]) return;
       var kx = sx(f.kHalf, d), spec = f.model === 'specific';
-      // the hollow mark is inset, so when the two models agree and the marks
-      // coincide the result reads as one nested glyph rather than a lost mark
-      var w = spec ? 3.2 : 5, top = spec ? ay + 6.2 : ay + 4, base = spec ? ay + 11.2 : ay + 12;
+      // both marks the same size; the hollow specific-binding one is drawn last
+      var w = 5, top = ay + 4, base = ay + 12;
       s += '<line class="kd-line' + (spec ? '' : ' dotted') + '" x1="' + kx + '" y1="' + M.t +
            '" x2="' + kx + '" y2="' + (ay + 3) + '" stroke="' + gc + '"/>';
       s += '<polygon points="' + (kx - w) + ',' + base + ' ' + (kx + w) + ',' + base + ' ' + kx + ',' + top +
@@ -2427,6 +2434,26 @@ function drawKin(){
       s += '<path d="' + d + '" fill="none" stroke="' + shade(g.idx, q, n) + '" stroke-width="2" stroke-linejoin="round"/>';
     }
   });
+  // One dotted line per ligand at t_eq (95%), when every concentration has
+  // reached 95% of its plateau (the t_eq in the results table), and, with
+  // dissociation, one at t1/2 after the wash-out. Each carries a triangle under
+  // the axis, as the Kd marks do on the equilibrium curve: hollow for t_eq,
+  // filled for t1/2.
+  kinCache.forEach(function(g){
+    var gc = col(g.idx % 3);
+    var slow = g.pts.reduce(function(a, P){ return P.t95 > a ? P.t95 : a; }, 0);
+    var mark = function(tx, filled){
+      var vx = x(tx), w = 5, top = ay + 4, base = ay + 12;
+      s += '<line class="kvline" x1="' + vx.toFixed(1) + '" x2="' + vx.toFixed(1) + '" y1="' + m.t + '" y2="' + (ay + 3) + '" stroke="' + gc + '" stroke-width="1.2" stroke-dasharray="1 4" opacity=".8"/>';
+      s += '<polygon points="' + (vx - w) + ',' + base + ' ' + (vx + w) + ',' + base + ' ' + vx + ',' + top +
+           '" fill="' + (filled ? gc : 'var(--surface)') + '" stroke="' + gc + '" stroke-width="1.5"/>';
+    };
+    if (slow > 0 && slow <= ta) mark(slow, false);
+    if (diss){
+      var th = Math.LN2 / g.L.koff;
+      if (th > 0 && ta + th <= t1) mark(ta + th, true);
+    }
+  });
   s += '<g id="khover" visibility="hidden" pointer-events="none"><line id="khl" y1="' + m.t + '" y2="' + (m.t + ih) +
        '" stroke="var(--ink)" stroke-opacity="0.35"/><g id="khd"></g></g>';
   s += '<rect id="khit" x="' + m.l + '" y="' + m.t + '" width="' + iw + '" height="' + ih + '" fill="transparent"/>';
@@ -2439,7 +2466,7 @@ function drawKin(){
     var n = g.pts.length, ramp = '';
     for (var q = 0; q < Math.min(n, 8); q++) ramp += '<i style="background:' + shade(g.idx, Math.round(q * (n - 1) / Math.max(1, Math.min(n, 8) - 1)), n) + '"></i>';
     return '<span class="kk"><span class="ramp">' + ramp + '</span><b>' + esc(g.name) + '</b></span>';
-  }).join('') + (kinCache.length ? '<span class="knote">darkest = highest [L]<sub>T</sub> · true kinetics, no noise' + (diss ? ' · surface: no depletion' : '') + '</span>' : '<span>Switch on a ligand to simulate its association.</span>');
+  }).join('') + (kinCache.length ? '<span class="knote">darkest = highest [L]<sub>T</sub> · △ t<sub>eq</sub> (95%, all concentrations)' + (diss ? ' · ▲ t½ after wash-out' : '') + ' · true kinetics, no noise' + (diss ? ' · surface: no depletion' : '') + '</span>' : '<span>Switch on a ligand to simulate its association.</span>');
 }
 
 function bindKinHover(){
@@ -2456,6 +2483,10 @@ function bindKinHover(){
     hov.setAttribute('visibility', 'visible');
     hl.setAttribute('x1', px); hl.setAttribute('x2', px);
     var dots = '', rows = '';
+    // in the dissociation phase the clock restarts at the wash-out, and each
+    // curve is read against where it started to decay (f_end), so the ratio
+    // reads 0.5 at t = t1/2
+    var diss = surfOn() && t > state.ta, td = t - state.ta;
     kinCache.forEach(function(g){
       var n = g.pts.length;
       if (kinCache.length > 1) rows += '<div class="kta">' + esc(g.name) + '</div>';
@@ -2465,13 +2496,15 @@ function bindKinHover(){
         var v = P.f(t), c = shade(g.idx, q, n);
         dots += '<circle cx="' + px + '" cy="' + kgeom.y(v) + '" r="3.5" fill="' + c + '" stroke="var(--surface)" stroke-width="1.5"/>';
         rows += '<div class="kr"><span><i class="ksw" style="background:' + c + '"></i>' + fmt(P.Lt, 3) + ' ' + state.unit +
-          '</span><span>' + v.toFixed(3) + '</span><span>' + (P.feq > 0 ? (v / P.feq).toFixed(3) : '—') + '</span></div>';
+          '</span><span>' + v.toFixed(3) + '</span><span>' + (diss ? (P.f(state.ta) > 0 ? (v / P.f(state.ta)).toFixed(3) : '—') : (P.feq > 0 ? (v / P.feq).toFixed(3) : '—')) + '</span></div>';
       });
     });
     hd.innerHTML = dots;
-    var tl = 't = ' + (t >= 100 ? t.toFixed(0) : t.toFixed(1)) + ' s' + (t >= 120 ? ' (' + dur(t) + ')' : '') +
-      (surfOn() ? (t > state.ta ? ' · dissociation' : ' · association') : '');
-    tip.innerHTML = '<div class="kt0">' + tl + '</div><div class="kr th"><span>[L]<sub>T</sub></span><span>f<sub>t</sub></span><span>f<sub>t</sub>/f<sub>eq</sub></span></div>' + rows;
+    var tt = diss ? td : t;
+    var tl = (diss ? 'dissociation t = ' : (surfOn() ? 'association t = ' : 't = ')) +
+      (tt >= 100 ? tt.toFixed(0) : tt.toFixed(1)) + ' s' + (tt >= 120 ? ' (' + dur(tt) + ')' : '');
+    tip.innerHTML = '<div class="kt0">' + tl + '</div><div class="kr th"><span>[L]<sub>T</sub></span><span>f<sub>t</sub></span><span>' +
+      (diss ? 'f<sub>t</sub>/f<sub>end</sub>' : 'f<sub>t</sub>/f<sub>eq</sub>') + '</span></div>' + rows;
     tip.hidden = false;
     var cw = box.clientWidth, tw = tip.offsetWidth, cx = ev.clientX - box.getBoundingClientRect().left;
     tip.style.left = Math.max(0, (cx + 14 + tw > cw ? cx - 14 - tw : cx + 14)) + 'px';
@@ -2797,7 +2830,7 @@ function renderKinAcc(kd){
     if (det.slow > slowest) slowest = det.slow;
     return '<section class="kcol" style="--ac:' + col(K.idx % 3) + '">' +
       '<h3 class="kcol-h"><span class="nm"><b class="dot" style="background:' + col(K.idx % 3) + '"></b>' + esc(K.name) + '</span>' +
-      '<span class="kacc-sub">slowest t<sub>eq</sub> ' + dur(det.slow) + '</span></h3>' +
+      '<span class="kacc-sub">t½ ' + dur(Math.LN2 / K.L.koff) + ' · slowest t<sub>eq</sub> ' + dur(det.slow) + '</span></h3>' +
       det.table + '</section>';
   }).join('');
   document.getElementById('kinAccSub').innerHTML = kd.length + (kd.length === 1 ? ' ligand' : ' ligands') + ' · ' +
@@ -2839,7 +2872,9 @@ function summaryTSV(){
     });
     out.push(row.join('\t'));
   });
-  if (document.querySelector('#thead th[rowspan]') && out.length > 1) out[1] = '\t' + out[1];
+  // the Ligand header spans the header rows below it: keep their columns aligned
+  var span = document.querySelector('#thead th[rowspan]'), rs = span ? +span.getAttribute('rowspan') : 1;
+  for (var r = 1; r < rs && r < out.length; r++) out[r] = '\t' + out[r];
   var G = cache ? cache.groups : [];
   return out.join('\r\n') + '\r\n';
 }
@@ -3047,10 +3082,11 @@ function renderResultsW(){
 
   if (!state.fitSpecific && !state.fitQuadratic){
     // no columns to name, so the header is reserved blank rather than dropped
-    thead.innerHTML = '<tr class="ph"><th rowspan="2">Ligand</th>' +
+    thead.innerHTML = '<tr class="ph suprow"><th rowspan="3">Ligand</th><th class="suphd" colspan="2">x</th><th class="suphd gl">x</th></tr>' +
+      '<tr class="ph">' +
       '<th class="grpth" colspan="2">x</th><th class="grpth gl">x</th></tr>' +
       '<tr class="ph"><th>K<sub>d</sub> (' + nt(u) + ')</th>' +
-      '<th>f at [L]<sub>max</sub></th><th class="gl">K<sub>d</sub> fit (' + nt(u) + ')</th></tr>';
+      '<th><span class="nt">f</span> at [L]<sub>max</sub></th><th class="gl">K<sub>d</sub> fit (' + nt(u) + ')</th></tr>';
     tbody.innerHTML = msg('Choose at least one model to fit. The simulated data are plotted above.', 3);
     renderKinAcc(state.kin ? kinData() : []);
     alignModels();
@@ -3065,19 +3101,34 @@ function renderResultsW(){
   var showHalf = state.fitSpecific && state.fitHill;
   var rmseH = '<span title="Root-mean-square residual over every replicate point; a correct model lands near the noise SD (' +
     sig(state.sd, 3) + ')">RMSE</span>';
-  var specCols = (showHalf ? ['K fit (' + u + '<sup>n</sup>)'] : [])
-    .concat(['K<sub>d</sub> fit (' + nt(u) + ')'], showHalf ? ['Hill n'] : [],
+  var specCols = (showHalf ? ['K fit (' + nt(u) + '<sup>n</sup>)'] : [])
+    .concat(['K<sub>d</sub> fit (' + nt(u) + ')'], showHalf ? ['Hill <span class="nt">n</span>'] : [],
             state.bmaxSpec ? ['B<sub>max</sub>'] : [], [rmseH]);
   var quadCols = ['K<sub>d</sub> fit (' + nt(u) + ')']
     .concat(state.fitPt ? ['[P]<sub>T</sub> fit (' + nt(u) + ')'] : [], state.bmaxQuad ? ['B<sub>max</sub>'] : [], [rmseH]);
 
   var kin = state.kin, kd = kin ? kinData() : [];
   document.getElementById('resSub').textContent = kin ? '· read at ' + dur(state.ta) : '';
-  var h1 = '<tr><th rowspan="2">Ligand</th>' +
-           '<th class="grpth" colspan="' + (2 + (kin ? 3 : 0) + (state.coop ? 1 : 0)) + '">Simulation conditions</th>',
-      h2 = '<tr><th>K<sub>d</sub> (' + nt(u) + ')</th>' + (state.coop ? '<th>Hill n</th>' : '') +
-           '<th>f at [L]<sub>max</sub></th>' +
-           (kin ? '<th><span class="sym">k<sub>on</sub> (M⁻¹s⁻¹)</span></th><th><span class="sym">k<sub>off</sub> (s⁻¹)</span></th><th><span class="sym">t½</span></th>' : '');
+  // Three header rows: what was simulated (the true parameters and, with
+  // kinetics, how far each well got toward steady state) against what the
+  // fits recovered; then the sub-groups; then the columns.
+  var simN = 2 + (kin ? 2 : 0) + (state.coop ? 1 : 0);
+  var kinCols = ['t<sub>eq</sub> (95%)', 'f/f<sub>eq</sub> [L]<sub>max</sub>', 'f/f<sub>eq</sub> [L]<sub>min</sub>'];
+  var ssN = kin ? kinCols.length : 0;
+  var fitN = (state.fitSpecific ? specCols.length : 0) + (state.fitQuadratic ? quadCols.length : 0);
+  var hA = '<tr class="suprow"><th rowspan="3">Ligand</th>' +
+           '<th class="suphd" colspan="' + (simN + ssN) + '">Simulated conditions</th>' +
+           '<th class="suphd gl" colspan="' + fitN + '">Data fitting</th>',
+      h1 = '<tr class="grprow"><th class="grpth" colspan="' + simN + '">' + (kin ? 'Parameters' : '') + '</th>',
+      h2 = '<tr><th>K<sub>d</sub> (' + nt(u) + ')</th>' + (state.coop ? '<th>Hill <span class="nt">n</span></th>' : '') +
+           '<th><span class="nt">f</span> at [L]<sub>max</sub></th>' +
+           (kin ? '<th><span class="sym">k<sub>on</sub> (M⁻¹s⁻¹)</span></th><th><span class="sym">k<sub>off</sub> (s⁻¹)</span></th>' : '');
+  // with kinetics on: how long equilibrium takes, and how far the top and
+  // bottom of the series have got by the time the plate is read
+  if (kin){
+    h1 += '<th class="grpth gl" colspan="' + kinCols.length + '"><a href="#kinAcc" class="tolink" title="Open the Steady-State Results for every concentration">Steady-state</a></th>';
+    kinCols.forEach(function(t, i){ h2 += '<th' + (i === 0 ? ' class="gl"' : '') + '><span class="sym">' + t + '</span></th>'; });
+  }
   if (state.fitSpecific){
     h1 += '<th class="grpth gl" data-grp="specific" colspan="' + specCols.length + '">' +
       specificName('cap') + '</th>';
@@ -3087,15 +3138,8 @@ function renderResultsW(){
     h1 += '<th class="grpth gl" data-grp="quadratic" colspan="' + quadCols.length + '">Quadratic 1:1</th>';
     quadCols.forEach(function(t, i){ h2 += '<th' + (i === 0 ? ' class="gl"' : '') + '>' + t + '</th>'; });
   }
-  // with kinetics on: how long equilibrium takes, and how far the top and
-  // bottom of the series have got by the time the plate is read
-  var kinCols = ['t<sub>eq</sub> (95%)', 'f/f<sub>eq</sub> [L]<sub>max</sub>', 'f/f<sub>eq</sub> [L]<sub>min</sub>'];
-  if (kin){
-    h1 += '<th class="grpth gl" colspan="' + kinCols.length + '"><a href="#kinAcc" class="tolink" title="Open the Steady-State Results for every concentration">Steady-state</a></th>';
-    kinCols.forEach(function(t, i){ h2 += '<th' + (i === 0 ? ' class="gl"' : '') + '><span class="sym">' + t + '</span></th>'; });
-  }
-  thead.innerHTML = h1 + '</tr>' + h2 + '</tr>';
-  var ncol = 3 + (kin ? 3 : 0) + (state.coop ? 1 : 0) + (state.fitSpecific ? specCols.length : 0) +
+  thead.innerHTML = hA + '</tr>' + h1 + '</tr>' + h2 + '</tr>';
+  var ncol = 3 + (kin ? 2 : 0) + (state.coop ? 1 : 0) + (state.fitSpecific ? specCols.length : 0) +
                  (state.fitQuadratic ? quadCols.length : 0) + (kin ? kinCols.length : 0);
 
   if (!c.groups.length){
@@ -3125,7 +3169,17 @@ function renderResultsW(){
         return '<td class="' + (good ? 'ok' : 'warn') + '" title="' + (good ? 'Reaches the plateau' :
           'Too low: the titration stops short of the plateau (see the design notes)') + '">' + fmt(fTop, 3) + '</td>';
       })() +
-      (kin ? '<td>' + sciPretty(g.L.kon) + '</td><td>' + sciPretty(g.L.koff) + '</td><td>' + dur(Math.LN2 / g.L.koff) + '</td>' : '');
+      (kin ? '<td>' + sciPretty(g.L.kon) + '</td><td>' + sciPretty(g.L.koff) + '</td>' : '');
+    var K = kin ? kd.filter(function(k){ return k.idx === g.idx; })[0] : null;
+    if (K){
+      var det = kinDetail(K);
+      var pc = function(P){
+        var v = P.feq > 0 ? 100 * P.f(state.ta) / P.feq : 0;
+        return '<td class="' + (v >= 95 ? 'ok' : 'warn') + '">' + (v >= 99.95 ? '100' : v.toFixed(1)) + '%</td>';
+      };
+      rows += '<td class="gl" title="The slowest point in the series: the minimum incubation">' + dur(det.slow) + '</td>' +
+        pc(K.pts[0]) + pc(K.pts[K.pts.length - 1]);
+    }
     var sp = pick('specific');
     if (state.fitSpecific && sp){
       if (showHalf) rows += '<td class="gl">' + (sp.fittedN ? pm(sp.K, sp.seK) : '\u2014') + '</td>';
@@ -3141,22 +3195,28 @@ function renderResultsW(){
       if (state.bmaxQuad) rows += '<td>' + pm(qd.B, qd.seB) + '</td>';
       rows += '<td>' + qd.rmse.toFixed(3) + '</td>';
     }
-    var K = kin ? kd.filter(function(k){ return k.idx === g.idx; })[0] : null;
-    if (K){
-      var det = kinDetail(K);
-      var pc = function(P){
-        var v = P.feq > 0 ? 100 * P.f(state.ta) / P.feq : 0;
-        return '<td class="' + (v >= 95 ? 'ok' : 'warn') + '">' + (v >= 99.95 ? '100' : v.toFixed(1)) + '%</td>';
-      };
-      rows += '<td class="gl" title="The slowest point in the series: the minimum incubation">' + dur(det.slow) + '</td>' +
-        pc(K.pts[0]) + pc(K.pts[K.pts.length - 1]);
-    }
     body.push(rows + '</tr>');
   });
   body[body.length - 1] = body[body.length - 1].replace('<tr>', '<tr class="end">');
   tbody.innerHTML = body.join('') + pad(nlig - body.length, ncol);
+  markFitBoundary(1 + simN + ssN);
   renderKinAcc(kd);
   alignModels();
+}
+
+// Give every cell that starts the Data fitting columns the darker rule. The
+// Ligand cell spans the header rows, so those rows start one column in.
+function markFitBoundary(col){
+  var thead = document.getElementById('thead'), tbody = document.getElementById('tbody');
+  var lead = thead.querySelector('th[rowspan]');
+  var spanRows = lead ? +lead.getAttribute('rowspan') : 1;
+  [].slice.call(thead.rows).concat([].slice.call(tbody.rows)).forEach(function(tr, r){
+    var c = (r > 0 && r < spanRows) ? 1 : 0;
+    [].forEach.call(tr.cells, function(cell){
+      if (c === col) cell.classList.add('fitb');
+      c += cell.colSpan || 1;
+    });
+  });
 }
 
 // The model row is fixed - both controls always sit in the same place. This
