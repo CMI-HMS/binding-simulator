@@ -606,8 +606,11 @@ a.cardlink{color:var(--ink);font-weight:600;text-decoration:underline;text-decor
 a.cardlink:hover{text-decoration-color:currentColor}
 .nbody .msub{margin:14px 0 4px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
 .nbody .msub:first-child{margin-top:0}
-.mcols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 36px;align-items:start}
-@media (max-width:900px){ .mcols{grid-template-columns:minmax(0,1fr)} .mcols > section + section{margin-top:14px} }
+.mcols{columns:2 420px;column-gap:36px}
+.mcols > section{display:contents}
+.mcols p,.mcols .eq{break-inside:avoid}
+.mcols .msub{break-after:avoid}
+.mcols > section + section > .msub:first-child{margin-top:14px}
 a.tolink::after{content:" ↓"}
 a.tolink{color:inherit;text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:3px}
 a.tolink:hover{color:var(--ink);text-decoration-color:currentColor}
@@ -695,8 +698,7 @@ thead th .sym{text-transform:none;letter-spacing:0;font-size:12px}
 .stage.notes-beside > .colR > .accs{position:absolute;inset:0;overflow:auto;padding-bottom:2px}
 #accsR:empty{display:none}
 .stage.notes-beside .accs .dcols .dcol{font-size:12.5px}
-.stage.notes-beside .accs .mcols{grid-template-columns:minmax(0,1fr)}
-.stage.notes-beside .accs .mcols > section + section{margin-top:14px}
+.stage.notes-beside .accs .mcols{columns:1}
 .stage.notes-beside .accs .terms,.stage.notes-beside .accs .termcols{columns:1}
 .stage.notes-beside .accs .split{grid-template-columns:minmax(0,1fr)}
 .stage.notes-beside .accs .kcols{grid-template-columns:minmax(0,1fr)}
@@ -1173,34 +1175,36 @@ input.stepin:disabled ~ .xsp,input.stepin[readonly] ~ .xsp{display:none}
       <p>The same 1:1 binding, followed through time.</p>
       <p class="eq"><span class="cm">reaction</span>P + L ⇌ PL, &nbsp;K<sub>d</sub> = k<sub>off</sub> ⁄ k<sub>on</sub></p>
       <p class="eq"><span class="cm">rate</span>d[PL]/dt = k<sub>on</sub>[P][L] − k<sub>off</sub>[PL]</p>
-      <p><b>In solution</b>, where C<sub>1</sub> and C<sub>2</sub> are the roots of the quadratic and C<sub>1</sub> is the equilibrium complex (derived in <a class="cardlink" href="#rateCard">Rate equations with depletion</a>):</p>
+      <p><b>In solution</b>, where C<sub>1</sub> and C<sub>2</sub> are the roots of the quadratic and C<sub>1</sub> is the equilibrium complex (derived in <a class="cardlink" href="#rateCard">Rate equations with depletion (in solution)</a>):</p>
       <p class="eq"><span class="cm">association</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
       <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub><span class="rad">√((P<sub>T</sub>+L<sub>T</sub>+K<sub>d</sub>)² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
       <p><b>Surface-bound (SPR/BLI)</b>, where t<sub>a</sub> is the association time:</p>
       <p class="eq"><span class="cm">association</span>f(t) = f<sub>eq</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>), &nbsp;k<sub>obs</sub> = k<sub>on</sub>[L] + k<sub>off</sub></p>
       <p class="eq"><span class="cm">steady state</span>f<sub>eq</sub> = [L] ⁄ ( K<sub>d</sub> + [L] )</p>
       <p class="eq"><span class="cm">dissociation</span>f(t) = f(t<sub>a</sub>)·e<sup>−k<sub>off</sub>(t − t<sub>a</sub>)</sup></p>
+      <h4 class="msub">[P]<sub>T</sub> assumptions</h4>
+      <p>[P]<sub>T</sub> is taken as known and fully active, the same at every point. <b>At equilibrium</b>, the data are simulated with depletion whatever model is fitted; only the quadratic model uses [P]<sub>T</sub> (fixed, or fitted with Fit [P]<sub>T</sub>), while specific binding and the Hill model assume free ligand equals total. <b>In solution with kinetics</b>, the rate equation depletes both partners from the same [P]<sub>T</sub>, so k<sub>obs</sub> and the read both depend on it. <b>Surface-bound</b>, [P]<sub>T</sub> is not used: the flowing ligand stays at [L]<sub>T</sub>, the quadratic reduces to specific binding, and k<sub>obs</sub> = k<sub>on</sub>[L] + k<sub>off</sub>.</p>
       </section>
       </div>
       <details class="note sub" id="rateCard">
-        <summary><h3>Rate equations with depletion</h3></summary>
+        <summary><h3>Rate equations with depletion (in solution)</h3></summary>
         <div class="nbody mcols">
         <section>
         <h4 class="msub">1 · The rate equation</h4>
-        <p>Let x = [PL]. Every complex formed uses up one protein and one ligand, so the free concentrations fall as x rises.</p>
-        <p class="eq"><span class="cm">free partners</span>[P] = P<sub>T</sub> − x, &nbsp;[L] = L<sub>T</sub> − x</p>
-        <p class="eq"><span class="cm">rate</span>dx/dt = k<sub>on</sub>(P<sub>T</sub> − x)(L<sub>T</sub> − x) − k<sub>off</sub>x</p>
+        <p>Every complex formed uses up one protein and one ligand, so the free concentrations fall as [PL] rises.</p>
+        <p class="eq"><span class="cm">free partners</span>[P] = P<sub>T</sub> − [PL], &nbsp;[L] = L<sub>T</sub> − [PL]</p>
+        <p class="eq"><span class="cm">rate</span>d[PL]/dt = k<sub>on</sub>(P<sub>T</sub> − [PL])(L<sub>T</sub> − [PL]) − k<sub>off</sub>[PL]</p>
         <p>Factor out k<sub>on</sub> and use K<sub>d</sub> = k<sub>off</sub>/k<sub>on</sub>:</p>
-        <p class="eq"><span class="cm">rearranged</span>dx/dt = k<sub>on</sub>[ x² − (P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>)x + P<sub>T</sub>L<sub>T</sub> ]</p>
+        <p class="eq"><span class="cm">rearranged</span>d[PL]/dt = k<sub>on</sub>( [PL]² − (P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>)[PL] + P<sub>T</sub>L<sub>T</sub> )</p>
         <h4 class="msub">2 · The quadratic and its two roots</h4>
-        <p>The bracket is a quadratic in x, so it factors as (x − C<sub>1</sub>)(x − C<sub>2</sub>). With b = P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>:</p>
+        <p>The expression in parentheses is a quadratic in [PL], so it factors as ([PL] − C<sub>1</sub>)([PL] − C<sub>2</sub>). With b = P<sub>T</sub> + L<sub>T</sub> + K<sub>d</sub>:</p>
         <p class="eq"><span class="cm">smaller root</span>C<sub>1</sub> = ( b − <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
         <p class="eq"><span class="cm">larger root</span>C<sub>2</sub> = ( b + <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span> ) ⁄ 2</p>
-        <p><b>C<sub>1</sub> is the equilibrium complex.</b> It is where dx/dt = 0, the same [PL] the quadratic 1:1 model gives. <b>C<sub>2</sub> is a mathematical root only.</b> It is larger than P<sub>T</sub> or L<sub>T</sub>, so the system never gets there, but it still shapes the curve. Two identities are useful: C<sub>1</sub>C<sub>2</sub> = P<sub>T</sub>L<sub>T</sub>, and C<sub>2</sub> − C<sub>1</sub> = <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span>.</p>
+        <p><b>C<sub>1</sub> is the equilibrium complex.</b> It is where d[PL]/dt = 0, the same [PL] the quadratic 1:1 model gives. <b>C<sub>2</sub> is a mathematical root only.</b> It is larger than P<sub>T</sub> or L<sub>T</sub>, so the system never gets there, but it still shapes the curve. Two identities are useful: C<sub>1</sub>C<sub>2</sub> = P<sub>T</sub>L<sub>T</sub>, and C<sub>2</sub> − C<sub>1</sub> = <span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span>.</p>
         </section>
         <section>
         <h4 class="msub">3 · Solving it</h4>
-        <p>dx/dt = k<sub>on</sub>(x − C<sub>1</sub>)(x − C<sub>2</sub>) separates and integrates exactly. Starting from x = 0 at t = 0:</p>
+        <p>d[PL]/dt = k<sub>on</sub>([PL] − C<sub>1</sub>)([PL] − C<sub>2</sub>) separates and integrates exactly. Starting from [PL] = 0 at t = 0:</p>
         <p class="eq"><span class="cm">association</span>[PL](t) = C<sub>1</sub>C<sub>2</sub>(1 − e<sup>−k<sub>obs</sub>t</sup>) ⁄ (C<sub>2</sub> − C<sub>1</sub>e<sup>−k<sub>obs</sub>t</sup>)</p>
         <p class="eq"><span class="cm">observed rate</span>k<sub>obs</sub> = k<sub>on</sub>(C<sub>2</sub> − C<sub>1</sub>) = k<sub>on</sub><span class="rad">√(b² − 4P<sub>T</sub>L<sub>T</sub>)</span></p>
         <h4 class="msub">4 · Sanity checks</h4>
@@ -1223,7 +1227,7 @@ input.stepin:disabled ~ .xsp,input.stepin[readonly] ~ .xsp{display:none}
 
   <footer>
     <p class="credit"><b>Kelly Arnett</b> · <a href="https://cmi.hms.harvard.edu/" target="_blank" rel="noopener noreferrer">Center for Macromolecular Interactions (CMI)</a>, Harvard Medical School</p>
-    <p class="madewith">Built with Claude Opus 5.5 (Anthropic)</p>
+    <p class="madewith">v1.2 · Built with Claude Opus 5.5 (Anthropic)</p>
   </footer>
 </div>
 
@@ -2641,16 +2645,51 @@ function eqNotes(){
   var best = function(x){ return x.g.fits.reduce(function(a, f){ return !a || f.rmse < a.rmse ? f : a; }, null); };
   var relOf = function(x){ var f = best(x);
     return f && f.seHalf > 0 && f.kHalf > 0 && f.rmse > 0 ? (f.seHalf / f.kHalf) * (sd / f.rmse) : NaN; };
-  var noisy = D.filter(function(x){ var r = relOf(x); return best(x) && (sd >= 0.1 || (sd > 0.05 && r > 0.1)); });
-  if (noisy.length) notes.push('<b>The noise is too high.</b> ' + noisy.map(function(x){
-      var f = best(x), rel = relOf(x);
-      // judged on the percentage as printed, so +-10% never asks for more
+  // Noise, judged on the noise SD that was set so the note does not flicker
+  // between draws: 0.1 of the full signal or more is high, over 0.2 too high.
+  // The RMSE is quoted as what the experimenter would see.
+  var noisy = sd >= 0.1 - 1e-9 ? D.filter(function(x){ return best(x); }) : [];
+  // parameters fitted beyond Kd, which noise makes it worth fixing
+  var extra = [];
+  if (state.fitSpecific && state.fitHill) extra.push('<em>n</em> = 1');
+  if (state.fitQuadratic && state.fitPt) extra.push('[P]<sub>T</sub>');
+  if ((state.fitSpecific && state.bmaxSpec) || (state.fitQuadratic && state.bmaxQuad)) extra.push('B<sub>max</sub>, if the plateau is known');
+  // free parameters in a fit, and how closely its RMSE can match the noise SD:
+  // an RMSE estimates the SD to about 1/sqrt(2(N - p))
+  var nPar = function(f){ return 1 + (f.fittedN ? 1 : 0) + (f.fittedB ? 1 : 0) + (f.fittedPt ? 1 : 0); };
+  var repsOf = function(x){ return Math.max(1, Math.round(num(x.g.L.reps, 3))); };
+  var relRm = function(x, f){ var N = x.np * repsOf(x) - nPar(f); return N > 0 ? 1 / Math.sqrt(2 * N) : Infinity; };
+  if (noisy.length) notes.push('<b>The noise is ' + (sd > 0.2 + 1e-9 ? 'too high' : 'high') + '.</b> ' +
+    noisy.map(function(x){
+      var f = best(x), rel = relOf(x), reps = repsOf(x), np = x.np, relR = relRm(x, f);
       if (isFinite(rel) && Math.round(100 * rel) <= 10) rel = Math.min(rel, 0.1);
-      var reps = Math.max(1, Math.round(num(x.g.L.reps, 3))), need = isFinite(rel) ? Math.ceil(reps * Math.pow(rel / 0.1, 2)) : 0;
-      return x.tag + ' scatters with an RMSE of ' + f.rmse.toFixed(2) + ' (' + Math.round(100 * f.rmse) + '% of the full signal)' +
-        (isFinite(rel) ? (rel <= 0.1 ? '; its replicates still pin K<sub>d</sub> to ±' + Math.round(100 * rel) + '%' : ', so its K<sub>d</sub> is known only to ±' + Math.round(100 * rel) + '%') +
-          (rel > 0.1 ? (need <= 12 ? '; about ' + need + ' replicates would bring that to ±10%' : '; replicates alone cannot bring that to ±10%, so the noise itself has to come down') : '') : ''); }).join('. ') +
-    '. As a guide, an RMSE under 0.05 of the signal is good and over 0.1 is too noisy. A correct model lands at the noise level, so an RMSE well above the scatter of the replicates points to the wrong model rather than noise.');
+      var needR = Math.ceil((50 + nPar(f)) / np - 1e-9);
+      return x.tag + ' scatters with an RMSE of ' + f.rmse.toFixed(2) + ' (noise SD ' + sig(sd, 3) + ')' +
+        (isFinite(rel) ? ', and its K<sub>d</sub> is known to ±' + Math.round(100 * rel) + '%' : '') +
+        '. With ' + reps + ' replicate' + (reps === 1 ? '' : 's') + ' of ' + np + ' points, that RMSE matches the noise SD only to within ±' + Math.round(100 * relR) + '%' +
+        (needR > reps ? '; ' + needR + ' replicates would bring it within ±10%' : ', close enough to judge the fit by'); }).join('. ') +
+    '. Keep the model simple with as few free parameters as possible' +
+    (extra.length ? ' (fix ' + extra.join(' and ') + ')' : '') + '.');
+  // A fit whose RMSE sits well above the noise SD - beyond what sampling of
+  // the RMSE itself allows - is the wrong model, not noisy data
+  var miss = [];
+  D.forEach(function(x){ x.g.fits.forEach(function(f){
+    if (f.rmse > sd * (1 + 3 * relRm(x, f)) && f.rmse - sd > 0.01) miss.push({ x: x, f: f });
+  }); });
+  // one note per model, so each names its own likely cause
+  [['specific', specificName('cap') === 'Hill model' ? 'Hill model' : 'Specific Binding'], ['quadratic', 'Quadratic 1:1']].forEach(function(m){
+    var mm = miss.filter(function(o){ return o.f.model === m[0]; });
+    if (!mm.length) return;
+    var why = [];
+    if (m[0] === 'specific' && mm.some(function(o){ return o.x.pt > 0.1 * o.x.kd; }))
+      why.push('With [P]<sub>T</sub> above K<sub>d</sub>/10, specific binding ignores ligand depletion; the quadratic model accounts for it.');
+    if (mm.some(function(o){ return o.x.n !== 1 && !o.f.fittedN; }))
+      why.push('A Hill coefficient other than 1 makes the curve steeper or shallower than a 1:1 model can follow.');
+    if (state.kin) why.push('With kinetics on, points read before equilibrium do not follow any equilibrium model.');
+    notes.push('<b>' + m[1] + ' RMSE above noise SD.</b> ' + mm.map(function(o){
+        return o.x.tag + ': RMSE ' + o.f.rmse.toFixed(3) + ' against a noise SD of ' + sig(sd, 3); }).join('; ') +
+      '. An RMSE well above the noise SD points to the wrong model rather than noise.' + (why.length ? ' ' + why.join(' ') : ''));
+  });
   var range = D.map(function(x){ return (many ? x.tag + ' runs ' : 'It runs from ') + pct(x.bot) + ' to ' + pct(x.top) + ' bound with ' + x.mid + ' points between 10% and 90%'; }).join('; ');
   // with kinetics on, the curve is only an equilibrium measurement if every
   // point has got there by the read; when they have not, that comes first and
@@ -2704,7 +2743,7 @@ function renderDesignNotes(){
     return '<div class="rc-notes dcol"><h4>' + title + '</h4>' + list.map(function(n){ return '<p>' + n + '</p>'; }).join('') + '</div>';
   };
   // the closed accordion still says whether anything needs attention
-  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The noise is too high|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The noise is|Specific Binding RMSE|Hill model RMSE|Quadratic 1:1 RMSE|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
   var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
   var kd = surfOn() ? kinData() : [];
   var kn = kd.length ? kinNotes(kd, count(eq) > 0) : [];
