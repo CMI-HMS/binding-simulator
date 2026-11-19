@@ -1550,7 +1550,11 @@ function fit2(raw, make, fitB){
 // on a grid around the [P]T entered (B profiled out as before)
 function fitKP(raw, fitB, pt0){
   var p0 = Math.log10(Math.max(pt0, 1e-6));
-  var kLo = -6, kHi = 8, pLo = p0 - 4, pHi = p0 + 3;
+  // upward to 1000x the entered [P]T or 10x the top of the titration,
+  // whichever is higher, so a fit that runs [P]T up is not cut short
+  var lmax = raw.reduce(function(a, r){ return Math.max(a, r.x); }, 0);
+  var pTop = Math.max(p0 + 3, Math.log10(Math.max(10 * lmax, 1e-6)));
+  var kLo = -6, kHi = 8, pLo = p0 - 4, pHi = pTop;
   var make = function(kd, pt){ return function(x){ return boundFrac(pt, x, kd, 1); }; };
   var bk = 0, bp = p0, bestS = Infinity, pass, g, h, ks, ps, s;
   for (pass = 0; pass < 5; pass++){
@@ -1567,7 +1571,7 @@ function fitKP(raw, fitB, pt0){
   }
   var kd = Math.pow(10, bk), pt = Math.pow(10, bp);
   // a best [P]T on the edge of the search means the data never pinned it down
-  var edge = bp <= p0 - 4 + 0.3 || bp >= p0 + 3 - 0.3;
+  var edge = bp <= p0 - 4 + 0.3 || bp >= pTop - 0.3;
   return { kd: kd, pt: pt, edge: edge, B: fitB ? bestScale(raw, make(kd, pt)) : 1, sse: bestS };
 }
 
@@ -2719,10 +2723,30 @@ function eqNotes(){
       '. Under-bound low-concentration points push the apparent midpoint to higher [L], so the curve reports a weaker binder than the true one.';
   }
   var mid = surfOn() ? ', and with no depletion on the surface the curve midpoint reports the K<sub>d</sub>.' : ', and [P]<sub>T</sub> is low enough that the curve midpoint reports the K<sub>d</sub>.';
-  if (!notes.length) notes.push(notEq
+  // the verdict is on the experiment's design alone, so the models and fit
+  // options chosen (and the RMSE notes they raise) never change it
+  if (!notes.filter(function(t){ return !/RMSE above noise SD/.test(t.slice(0, 80)); }).length) notes.push(notEq
     ? '<b>' + (many ? 'Every titration would be' : 'The titration would be') + ' well designed at equilibrium.</b> ' + range + mid
     : '<b>' + (many ? 'Every titration is' : 'The titration is') + ' well designed' + (state.kin ? ' at equilibrium' : '') + '.</b> ' + range + mid);
   if (notEq) notes.unshift(notEq);
+  // Fit [P]T where the curve departs from equilibrium 1:1 binding for some
+  // other reason: the fitted [P]T then soaks up that departure, so it and the
+  // Kd beside it are apparent values for this assay, not the true ones.
+  if (state.fitQuadratic && state.fitPt){
+    var qf = D.map(function(x){ return { x: x, f: x.g.fits.filter(function(f){ return f.model === 'quadratic' && f.fittedPt; })[0] }; })
+      // only where [P]T was actually fitted (n.d. has its own note) and
+      // something other than depletion bends the curve
+      .filter(function(o){ return o.f && !o.f.ptUndef && (notEq || (state.coop && o.x.n !== 1)); });
+    var pc = [];
+    if (notEq) pc.push('data collected before equilibrium');
+    if (state.coop && qf.some(function(o){ return o.x.n !== 1; })) pc.push('cooperative binding (<em>n</em> ≠ 1), which a 1:1 model cannot describe');
+    if (qf.length && pc.length) notes.unshift('<b>Overfitting with Fit [P]<sub>T</sub>: disable Fit [P]<sub>T</sub> and report as EC<sub>50</sub>' +
+      (state.coop && qf.some(function(o){ return o.x.n !== 1; }) ? ', or fit an alternate model' : '') + '.</b> The quadratic 1:1 model fits [P]<sub>T</sub> to describe ligand depletion, but this curve also departs from equilibrium 1:1 binding. ' +
+      qf.map(function(o){ return o.x.tag + ' returns [P]<sub>T</sub> = ' + pm(o.f.pt, o.f.sePt) + ' ' + u + (surfOn() ? ' (not used on a surface)' : ' (set ' + fmt(num(o.x.g.L.pt, 0), 3) + ' ' + u + ')') +
+        ' and K<sub>d</sub> = ' + fmt(o.f.kHalf, 3) + ' ' + u + ' (true ' + fmt(o.x.kd, 3) + ' ' + u + '), a midpoint of ' + fmt(o.f.kHalf + o.f.pt / 2, 3) + ' ' + u; }).join('; ') +
+      '. A fitted [P]<sub>T</sub> overfits experimental deviations from the quadratic 1:1 model. A good fit does not solve the problem; it hides it, which in this case is ' + pc.join(' and ') +
+      '. Neither fitted value can be taken at face value; interpret only the midpoint (K<sub>d</sub> + [P]<sub>T</sub>/2), as an EC<sub>50</sub> for this assay.');
+  }
   // Fit n on data simulated 1:1 (cooperativity off): the Hill slope then
   // measures nothing about the binding and only absorbs what bends the curve
   // away from 1:1, so its midpoint is an assay EC50, never a Kd. Always said,
@@ -2734,22 +2758,37 @@ function eqNotes(){
       var cause = [];
       if (notEq) cause.push('data collected before equilibrium');
       if (hf.some(function(o){ return o.x.pt > 0.1 * o.x.kd; })) cause.push('ligand depletion');
-      var ec = '<b>Fit <em>n</em> on 1:1 binding: report an EC<sub>50</sub>, not a K<sub>d</sub>.</b> Cooperativity is off, so every ligand binds 1:1 (<em>n</em> = 1), but the Hill model is fitting <em>n</em>. ' +
+      var ec = '<b>Overfitting with Fit <em>n</em>: report as EC<sub>50</sub>, not K<sub>d</sub>' +
+        (hf.some(function(o){ return o.x.pt > 0.1 * o.x.kd; }) ? ', or fit an alternate model' : '') + '.</b> Cooperativity is off, so every ligand binds 1:1 (<em>n</em> = 1), but the Hill model is fitting <em>n</em>. ' +
         hf.map(function(o){ return o.x.tag + ' returns <em>n</em> = ' + pm(o.f.n, o.f.seN) + ' and a midpoint of ' + fmt(o.f.kHalf, 3) + ' ' + u + ' (true K<sub>d</sub> ' + fmt(o.x.kd, 3) + ' ' + u + ')'; }).join('; ') +
         '. A Hill slope fitted to single-site binding does not measure cooperativity; it overfits experimental deviations from the 1:1 model.' +
         (cause.length ? ' A good fit does not solve the problem; it hides it, which in this case is ' + cause.join(' and ') + '. Interpret the midpoint only as an EC<sub>50</sub> for this assay.'
           : ' Nothing distorts this curve, so <em>n</em> lands near 1, but the extra free parameter only widens the error. Interpret the midpoint only as an EC<sub>50</sub> for this assay, and fix <em>n</em> = 1.');
-      notes.splice(notEq ? 1 : 0, 0, ec);
+      notes.unshift(ec);
     }
   }
   // Fit [P]T: say plainly when the data cannot determine it
   if (state.fitQuadratic && state.fitPt){
     var nd = D.filter(function(x){ return x.g.fits.some(function(f){ return f.fittedPt && f.ptUndef; }); });
-    if (nd.length) notes.push('<b>[P]<sub>T</sub> cannot be fitted</b> for ' + nd.map(function(x){
+    if (nd.length && surfOn()) notes.push('<b>[P]<sub>T</sub> cannot be fitted</b> for ' + nd.map(function(x){ return x.tag; }).join(', ') +
+      '. On a surface the flowing ligand is never depleted, so [P]<sub>T</sub> plays no part in the curve: the quadratic model reduces to specific binding and the table shows n.d.');
+    else if (nd.length) notes.push('<b>[P]<sub>T</sub> cannot be fitted</b> for ' + nd.map(function(x){
         return x.tag + ' ([P]<sub>T</sub> ' + fmt(x.pt, 3) + ' ' + u + ', K<sub>d</sub> ' + fmt(x.kd, 3) + ' ' + u + ')'; }).join(', ') +
       '. Well below K<sub>d</sub> the curve barely depends on [P]<sub>T</sub>, so the quadratic fit cannot pin it down and the table shows n.d.; its K<sub>d</sub> is still sound. Fitting [P]<sub>T</sub> needs [P]<sub>T</sub> near or above K<sub>d</sub>, where depletion shapes the curve; otherwise hold it at the known value.');
   }
-  return notes;
+  // Reading order: whether the experiment itself measures equilibrium binding
+  // first, then the rest of its design, then how well the models fit, and
+  // last what the fitted parameters can be trusted to mean. The sort is
+  // stable, so notes keep their order within a group.
+  var rank = function(t){
+    if (/^<b>The (curve is not|steady-state curve has not)/.test(t)) return 0;
+    if (/RMSE above noise SD/.test(t.slice(0, 80))) return 2;
+    if (/^<b>(Overfitting|\[P\]<sub>T<\/sub> cannot be fitted)/.test(t)) return 3;
+    return 1;
+  };
+  return notes.map(function(t, i){ return { t: t, i: i, r: rank(t) }; })
+    .sort(function(a, b){ return a.r - b.r || a.i - b.i; })
+    .map(function(o){ return o.t; });
 }
 
 function renderDesignNotes(){
@@ -2762,7 +2801,7 @@ function renderDesignNotes(){
     return '<div class="rc-notes dcol"><h4>' + title + '</h4>' + list.map(function(n){ return '<p>' + n + '</p>'; }).join('') + '</div>';
   };
   // the closed accordion still says whether anything needs attention
-  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The noise is|Specific Binding RMSE|Fit <em>n<\/em> on 1:1|Hill model RMSE|Quadratic 1:1 RMSE|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The noise is|Specific Binding RMSE|Overfitting|Hill model RMSE|Quadratic 1:1 RMSE|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
   var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
   var kd = surfOn() ? kinData() : [];
   var kn = kd.length ? kinNotes(kd, count(eq) > 0) : [];
