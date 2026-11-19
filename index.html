@@ -2682,7 +2682,7 @@ function eqNotes(){
     if (!mm.length) return;
     var why = [];
     if (m[0] === 'specific' && mm.some(function(o){ return o.x.pt > 0.1 * o.x.kd; }))
-      why.push('With [P]<sub>T</sub> above K<sub>d</sub>/10, specific binding ignores ligand depletion; the quadratic model accounts for it.');
+      why.push('With [P]<sub>T</sub> above K<sub>d</sub>/10, ' + (m[1] === 'Hill model' ? 'the Hill model' : 'specific binding') + ' ignores ligand depletion; the quadratic model accounts for it.');
     if (mm.some(function(o){ return o.x.n !== 1 && !o.f.fittedN; }))
       why.push('A Hill coefficient other than 1 makes the curve steeper or shallower than a 1:1 model can follow.');
     if (state.kin) why.push('With kinetics on, points read before equilibrium do not follow any equilibrium model.');
@@ -2723,6 +2723,25 @@ function eqNotes(){
     ? '<b>' + (many ? 'Every titration would be' : 'The titration would be') + ' well designed at equilibrium.</b> ' + range + mid
     : '<b>' + (many ? 'Every titration is' : 'The titration is') + ' well designed' + (state.kin ? ' at equilibrium' : '') + '.</b> ' + range + mid);
   if (notEq) notes.unshift(notEq);
+  // Fit n on data simulated 1:1 (cooperativity off): the Hill slope then
+  // measures nothing about the binding and only absorbs what bends the curve
+  // away from 1:1, so its midpoint is an assay EC50, never a Kd. Always said,
+  // whether or not the fit looks good - a good-looking fit is the trap.
+  if (!state.coop && state.fitSpecific && state.fitHill){
+    var hf = D.map(function(x){ return { x: x, f: x.g.fits.filter(function(f){ return f.model === 'specific' && f.fittedN; })[0] }; })
+      .filter(function(o){ return o.f; });
+    if (hf.length){
+      var cause = [];
+      if (notEq) cause.push('data collected before equilibrium');
+      if (hf.some(function(o){ return o.x.pt > 0.1 * o.x.kd; })) cause.push('ligand depletion');
+      var ec = '<b>Fit <em>n</em> on 1:1 binding: report an EC<sub>50</sub>, not a K<sub>d</sub>.</b> Cooperativity is off, so every ligand binds 1:1 (<em>n</em> = 1), but the Hill model is fitting <em>n</em>. ' +
+        hf.map(function(o){ return o.x.tag + ' returns <em>n</em> = ' + pm(o.f.n, o.f.seN) + ' and a midpoint of ' + fmt(o.f.kHalf, 3) + ' ' + u + ' (true K<sub>d</sub> ' + fmt(o.x.kd, 3) + ' ' + u + ')'; }).join('; ') +
+        '. A Hill slope fitted to single-site binding does not measure cooperativity; it overfits experimental deviations from the 1:1 model.' +
+        (cause.length ? ' A good fit does not solve the problem; it hides it, which in this case is ' + cause.join(' and ') + '. Interpret the midpoint only as an EC<sub>50</sub> for this assay.'
+          : ' Nothing distorts this curve, so <em>n</em> lands near 1, but the extra free parameter only widens the error. Interpret the midpoint only as an EC<sub>50</sub> for this assay, and fix <em>n</em> = 1.');
+      notes.splice(notEq ? 1 : 0, 0, ec);
+    }
+  }
   // Fit [P]T: say plainly when the data cannot determine it
   if (state.fitQuadratic && state.fitPt){
     var nd = D.filter(function(x){ return x.g.fits.some(function(f){ return f.fittedPt && f.ptUndef; }); });
@@ -2743,7 +2762,7 @@ function renderDesignNotes(){
     return '<div class="rc-notes dcol"><h4>' + title + '</h4>' + list.map(function(n){ return '<p>' + n + '</p>'; }).join('') + '</div>';
   };
   // the closed accordion still says whether anything needs attention
-  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The noise is|Specific Binding RMSE|Hill model RMSE|Quadratic 1:1 RMSE|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
+  var problem = /^<b>(The highest|The lowest concentration is too|The protein concentration|Ligand depletion|Few points|The noise is|Specific Binding RMSE|Fit <em>n<\/em> on 1:1|Hill model RMSE|Quadratic 1:1 RMSE|The curve is not|The steady-state curve has not|Not every point|Depletion shapes|Too little dissociation|Kinetics too fast|Association is too short)/;
   var count = function(list){ return list.filter(function(t){ return problem.test(t); }).length; };
   var kd = surfOn() ? kinData() : [];
   var kn = kd.length ? kinNotes(kd, count(eq) > 0) : [];
